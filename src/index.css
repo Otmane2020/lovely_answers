@@ -43,35 +43,38 @@
   }
 
   .dark {
-    --background: 240 10% 4%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 6%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 6%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 222 47% 55%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 240 5% 12%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 5% 14%;
-    --muted-foreground: 240 5% 65%;
-    --accent: 240 5% 14%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 63% 50%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5% 16%;
-    --input: 240 5% 16%;
-    --ring: 222 47% 55%;
-    
+    --background: 233 40% 8%;
+    --foreground: 231 40% 96%;
+    --card: 233 38% 11%;
+    --card-foreground: 231 40% 96%;
+    --popover: 233 38% 11%;
+    --popover-foreground: 231 40% 96%;
+    --primary: 232 55% 62%;
+    --primary-foreground: 233 52% 12%;
+    --primary-deep: 233 52% 18%;
+    --secondary: 233 30% 16%;
+    --secondary-foreground: 231 40% 96%;
+    --muted: 233 30% 16%;
+    --muted-foreground: 233 20% 70%;
+    --accent: 233 30% 18%;
+    --accent-foreground: 231 40% 96%;
+    --destructive: 0 53% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 156 50% 45%;
+    --warning: 35 80% 55%;
+    --border: 233 25% 20%;
+    --input: 233 25% 20%;
+    --ring: 232 55% 62%;
+
     /* Custom AutoPilot Geo tokens - Dark */
-    --gradient-primary: linear-gradient(135deg, hsl(222, 47%, 45%) 0%, hsl(222, 47%, 35%) 100%);
-    --gradient-accent: linear-gradient(135deg, hsl(222, 47%, 45%) 0%, hsl(222, 47%, 35%) 100%);
-    --gradient-subtle: linear-gradient(180deg, hsl(240, 10%, 6%) 0%, hsl(240, 10%, 4%) 100%);
-    --glass-bg: hsla(240, 10%, 8%, 0.8);
-    --glass-border: hsla(240, 5%, 20%, 0.5);
-    --shadow-soft: 0 4px 24px -4px hsla(222, 47%, 30%, 0.25);
-    --shadow-glow: 0 0 60px hsla(222, 47%, 30%, 0.3);
-    --sidebar-bg: 240 10% 6%;
+    --gradient-primary: linear-gradient(150deg, hsl(232, 51%, 48%) 0%, hsl(233, 52%, 22%) 100%);
+    --gradient-accent: linear-gradient(150deg, hsl(232, 51%, 48%) 0%, hsl(233, 52%, 22%) 100%);
+    --gradient-subtle: linear-gradient(180deg, hsl(233, 38%, 11%) 0%, hsl(233, 40%, 8%) 100%);
+    --glass-bg: hsla(233, 38%, 11%, 0.8);
+    --glass-border: hsla(233, 25%, 26%, 0.6);
+    --shadow-soft: 0 4px 24px -4px hsla(233, 52%, 8%, 0.5);
+    --shadow-glow: 0 0 60px hsla(232, 55%, 62%, 0.25);
+    --sidebar-bg: 233 52% 14%;
   }
 }
 
@@ -86,6 +89,16 @@
 
   body {
     @apply bg-background text-foreground antialiased;
+  }
+
+  /* Typographie du thème GEO : titres en Space Grotesk */
+  h1, h2, h3, h4, .display {
+    font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+    letter-spacing: -0.015em;
+  }
+
+  .mono {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
   }
 }
 
