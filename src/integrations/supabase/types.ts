@@ -3278,6 +3278,7 @@ export type Database = {
           id: string
           is_active: boolean | null
           language: string
+          last_geo_autogen_at: string | null
           name: string
           needs_onboarding: boolean
           onboarding_last_error: string | null
@@ -3307,6 +3308,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           language?: string
+          last_geo_autogen_at?: string | null
           name: string
           needs_onboarding?: boolean
           onboarding_last_error?: string | null
@@ -3336,6 +3338,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           language?: string
+          last_geo_autogen_at?: string | null
           name?: string
           needs_onboarding?: boolean
           onboarding_last_error?: string | null
