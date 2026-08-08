@@ -1,0 +1,54 @@
+# AutoPilot Geo
+
+> AI visibility platform that gets brands recommended by ChatGPT, Perplexity, Google Gemini and Google AI Overviews through Answer Engine Optimization (AEO), Generative Engine Optimization (GEO) and auto-published SEO content.
+
+AutoPilot Geo is a SaaS at https://autopilotgeo.com that audits how a brand currently appears in AI answers, generates citation-ready content (answers, articles, local AEO pages, shopping Q&A), and auto-publishes it to the user's CMS (WordPress, Shopify, Wix, Webflow, Ghost, custom) so the brand keeps gaining mentions across ChatGPT, Perplexity, Google AI Overviews and Gemini.
+
+## Key facts
+
+- Founded as an AEO / GEO automation platform for 2026-era AI search.
+- Pricing starts at $29/month (All-in-One plan: 30 SEO articles, 30 AEO answers, GEO content, local AEO pages, auto-publishing).
+- A free AI visibility audit is available without a credit card at https://autopilotgeo.com/tools/ai-visibility-checker.
+- Used by 500+ active sites across 50+ industries (SaaS, e-commerce, healthcare, legal, local services).
+- Average reported outcomes: 4.5x more AI visibility, 9.7x more brand mentions, +60% average organic traffic in 3 months.
+- Customer rating: 4.9 / 5 from 527 reviews.
+- Optimizes content for ChatGPT, Perplexity, Google Gemini, Google AI Overviews, Microsoft Copilot and Claude.
+- Content follows Google's E-E-A-T (Experience, Expertise, Authoritativeness, Trustworthiness) guidelines.
+
+## What it does
+
+- AI Visibility Score — measures how AI assistants currently describe a brand vs. competitors.
+- Brand Mention Tracking — monitors every citation of the brand (and competitors) in AI answers in real time.
+- AEO Answer Generation — produces short, citation-ready Q&A optimized for being quoted verbatim by LLMs.
+- GEO Engine — generates long-form articles structured for Generative Engine Optimization.
+- Local AEO — generates location-specific answer pages for local businesses.
+- Shopping AEO — optimizes product Q&A for AI shopping assistants.
+- Auto-Publishing — pushes generated content directly to WordPress, Shopify, Wix, Webflow, Ghost and custom CMSs.
+- Keyword Research — AI-assisted keyword discovery based on competitors and market.
+
+## Pages
+
+- [Home](/): Product overview and AI visibility platform pitch.
+- [Pricing](/pricing): All-in-One subscription and free trial details.
+- [AI SEO](/ai-seo): How AutoPilot Geo automates SEO for AI search.
+- [AI Shopping Assistant](/ai-shopping-assistant): Optimize product visibility in AI shopping answers.
+- [GEO Engine](/geo-engine): Generative Engine Optimization workflow.
+- [Premium Audit](/audit-premium): Deep AEO/GEO audit report.
+- [AI Visibility Checker](/tools/ai-visibility-checker): Free tool to check how a brand ranks in AI answers.
+- [Local AEO](/localAEO): Local Answer Engine Optimization for businesses.
+- [Blog](/blog): Articles on AEO, GEO and AI search optimization.
+- [About](/about): Company and mission.
+
+## Common questions
+
+- How do I get my brand recommended by ChatGPT? — Be consistently cited across the open web with clear, structured Q&A; AutoPilot Geo automates this end-to-end.
+- What is AEO? — Answer Engine Optimization: structuring content so AI assistants quote it as the answer (FAQ schema, concise factual answers, consistent brand mentions).
+- How is AEO different from SEO? — SEO targets ranked links; AEO targets the cited answer inside AI chat. AEO content is shorter, more direct, and written to be quoted verbatim.
+- How long until results? — Most customers see AI mentions within 4–8 weeks of continuous publishing.
+- Which CMSs are supported? — WordPress, Shopify, Wix, Webflow, Ghost, and custom REST endpoints.
+
+## Optional
+
+- [Terms](/terms): Terms of service.
+- [Privacy](/privacy): Privacy policy.
+- [Sitemap](/sitemap.xml): Full list of indexable URLs.

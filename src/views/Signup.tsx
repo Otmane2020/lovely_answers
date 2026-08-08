@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { Helmet } from "react-helmet-async";
 import { trackSignUp } from "@/lib/gtag-conversions";
 import { trackMetaLead } from "@/lib/meta-pixel";
 import { useRouter } from "next/navigation";
@@ -38,13 +39,27 @@ export default function Signup() {
 
   useEffect(() => {
     if (!user) return;
-    const checkProject = async () => {
+    const checkSubAndRedirect = async () => {
+      // Check active subscription/trial first — if none, force checkout
+      try {
+        const { data: sub } = await supabase.functions.invoke("check-subscription");
+        if (!sub?.subscribed && !sub?.trial) {
+          console.log("[SIGNUP] No active subscription/trial → /checkout");
+          window.location.replace("/checkout?plan=pro&cycle=annual");
+          return;
+        }
+      } catch (e) {
+        console.error("[SIGNUP] check-subscription failed", e);
+        window.location.replace("/checkout?plan=pro&cycle=annual");
+        return;
+      }
       const { data } = await supabase.from("projects").select("id").eq("user_id", user.id).limit(1);
-      if (data && data.length > 0) router.replace("/dashboard");
-      else router.replace("/wizard");
+      const target = data && data.length > 0 ? "/dashboard" : "/wizard";
+      console.log("[SIGNUP] Has subscription → redirecting to", target);
+      window.location.replace(target);
     };
-    checkProject();
-  }, [user, router]);
+    checkSubAndRedirect();
+  }, [user]);
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
@@ -75,24 +90,45 @@ export default function Signup() {
   };
 
   const handleGoogleSignIn = async () => {
+    sessionStorage.setItem("post_oauth_intent", "signup");
     const { error } = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: `${window.location.origin}/auth`,
+      redirect_uri: `${window.location.origin}/auth?intent=signup`,
     });
-    if (error) toast({ title: "Error", description: "Google sign-in failed.", variant: "destructive" });
+    if (error) {
+      sessionStorage.removeItem("post_oauth_intent");
+      toast({ title: "Error", description: "Google sign-in failed.", variant: "destructive" });
+      return;
+    }
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      window.location.replace("/checkout?plan=pro&cycle=annual");
+    }
   };
 
   const handleAppleSignIn = async () => {
+    sessionStorage.setItem("post_oauth_intent", "signup");
     const { error } = await lovable.auth.signInWithOAuth("apple", {
-      redirect_uri: `${window.location.origin}/auth`,
+      redirect_uri: `${window.location.origin}/auth?intent=signup`,
     });
-    if (error) toast({ title: "Error", description: "Apple sign-in failed.", variant: "destructive" });
+    if (error) {
+      sessionStorage.removeItem("post_oauth_intent");
+      toast({ title: "Error", description: "Apple sign-in failed.", variant: "destructive" });
+    }
   };
 
   if (authLoading) {
-    return <div className="min-h-screen flex items-center justify-center bg-[#1a2058]"><Loader2 className="h-8 w-8 animate-spin text-violet-400" /></div>;
+    return <div className="min-h-screen flex items-center justify-center bg-[hsl(222,47%,11%)]"><Loader2 className="h-8 w-8 animate-spin text-violet-400" /></div>;
   }
 
   return (
+    <>
+      <Helmet>
+        <title>Create Your Account | AutoPilot Geo</title>
+        <meta name="description" content="Create your AutoPilot Geo account to start getting cited by ChatGPT, Gemini and Perplexity in 30 days." />
+        <link rel="canonical" href="https://autopilotgeo.com/signup" />
+        <meta name="robots" content="noindex,follow" />
+      </Helmet>
     <div className="min-h-screen bg-white flex">
       {/* Left Panel */}
       <div className="flex-1 flex flex-col justify-center px-8 py-12 lg:px-16">
@@ -103,7 +139,7 @@ export default function Signup() {
 
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight text-[#1a2058]">Create an account</h1>
+              <h1 className="text-3xl font-bold tracking-tight text-[hsl(222,47%,11%)]">Create an account</h1>
               <p className="mt-2 text-gray-500">
                 Already have an account?{" "}
                 <Link href="/auth" className="text-violet-600 font-medium hover:underline">Sign in</Link>
@@ -122,30 +158,30 @@ export default function Signup() {
 
             <div className="relative">
               <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-gray-200" /></div>
-              <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-gray-400">Or</span></div>
+              <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-gray-600">Or</span></div>
             </div>
 
             <form onSubmit={handleSignUp} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="fullName" className="text-gray-600">Full name</Label>
                 <div className="relative">
-                  <User className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                  <User className="absolute left-3 top-3 h-5 w-5 text-gray-600" />
                   <Input id="fullName" placeholder="John Doe" value={fullName} onChange={(e) => setFullName(e.target.value)} className="pl-10 h-12 border-gray-200" />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone" className="text-gray-600">
-                  Phone <span className="text-gray-400 font-normal text-xs">(optional — get a welcome AI call)</span>
+                  Phone <span className="text-gray-600 font-normal text-xs">(optional — get a welcome AI call)</span>
                 </Label>
                 <div className="relative">
-                  <Phone className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                  <Phone className="absolute left-3 top-3 h-5 w-5 text-gray-600" />
                   <Input id="phone" type="tel" placeholder="+1 234 567 8900" value={phone} onChange={(e) => setPhone(e.target.value)} className="pl-10 h-12 border-gray-200" />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-gray-600">Email</Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                  <Mail className="absolute left-3 top-3 h-5 w-5 text-gray-600" />
                   <Input id="email" type="email" placeholder="you@example.com" value={email} onChange={(e) => { setEmail(e.target.value); setErrors(prev => ({ ...prev, email: undefined })); }} className={`pl-10 h-12 border-gray-200 ${errors.email ? "border-red-500" : ""}`} required />
                 </div>
                 {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
@@ -153,21 +189,21 @@ export default function Signup() {
               <div className="space-y-2">
                 <Label htmlFor="password" className="text-gray-600">Password</Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                  <Lock className="absolute left-3 top-3 h-5 w-5 text-gray-600" />
                   <Input id="password" type={showPassword ? "text" : "password"} placeholder="Min. 6 characters" value={password} onChange={(e) => { setPassword(e.target.value); setErrors(prev => ({ ...prev, password: undefined })); }} className={`pl-10 pr-10 h-12 border-gray-200 ${errors.password ? "border-red-500" : ""}`} required />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-3 text-gray-400 hover:text-gray-600">
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-3 text-gray-600 hover:text-gray-600">
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
                 </div>
                 {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
               </div>
-              <Button type="submit" className="w-full h-12 text-base bg-[#1a2058] text-white hover:bg-[#232c66]" disabled={isLoading}>
+              <Button type="submit" className="w-full h-12 text-base bg-[hsl(222,47%,11%)] text-white hover:bg-[hsl(222,47%,15%)]" disabled={isLoading}>
                 {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <ArrowRight className="mr-2 h-5 w-5" />}
                 Create account
               </Button>
             </form>
 
-            <p className="text-xs text-center text-gray-400">
+            <p className="text-xs text-center text-gray-600">
               By signing up, you agree to our <Link href="/terms" className="underline hover:text-gray-600">Terms</Link> and <Link href="/privacy" className="underline hover:text-gray-600">Privacy Policy</Link>.
             </p>
           </motion.div>
@@ -175,7 +211,7 @@ export default function Signup() {
       </div>
 
       {/* Right Panel - Dark Navy */}
-      <div className="hidden lg:flex flex-1 bg-[#1a2058] items-center justify-center p-12 relative overflow-hidden">
+      <div className="hidden lg:flex flex-1 bg-[hsl(222,47%,11%)] items-center justify-center p-12 relative overflow-hidden">
         <div className="absolute top-1/3 left-1/4 w-[400px] h-[400px] bg-violet-500/10 rounded-full blur-[150px]" />
         <div className="relative max-w-lg text-center space-y-6">
           <div className="w-20 h-20 rounded-2xl bg-white/10 flex items-center justify-center mx-auto">
@@ -198,5 +234,6 @@ export default function Signup() {
         </div>
       </div>
     </div>
+    </>
   );
 }

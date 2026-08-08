@@ -7,9 +7,6 @@ on:
       - 'supabase/functions/**'
   workflow_dispatch:  # allows manual trigger from GitHub UI
 
-env:
-  PROJECT_REF: pnohfokjlhpzrkczruju
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -31,7 +28,7 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
       - name: Link Supabase project
-        run: supabase link --project-ref $PROJECT_REF --yes
+        run: supabase link --project-ref pnohfokjlhpzrkczruju --yes
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
@@ -43,32 +40,25 @@ jobs:
             TWILIO_AUTH_TOKEN="${{ secrets.TWILIO_AUTH_TOKEN }}" \
             TWILIO_PHONE_NUMBER="${{ secrets.TWILIO_PHONE_NUMBER }}" \
             TWILIO_WHATSAPP_NUMBER="whatsapp:${{ secrets.TWILIO_PHONE_NUMBER }}" \
-            --project-ref $PROJECT_REF
+            --project-ref pnohfokjlhpzrkczruju
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
-      - name: Deploy ALL edge functions
+      - name: Deploy welcome-automation
         run: |
-          set -e
-          FAILED=""
-          for dir in supabase/functions/*/; do
-            name=$(basename "$dir")
-            # skip shared code folders (no entrypoint) and hidden dirs
-            case "$name" in _*|.*) echo "⏭️  Skipping $name"; continue;; esac
-            if [ ! -f "$dir/index.ts" ]; then
-              echo "⏭️  Skipping $name (no index.ts)"
-              continue
-            fi
-            echo "🚀 Deploying $name..."
-            if ! supabase functions deploy "$name" --project-ref $PROJECT_REF --no-verify-jwt; then
-              echo "❌ Failed: $name"
-              FAILED="$FAILED $name"
-            fi
-          done
-          if [ -n "$FAILED" ]; then
-            echo "❌ Some functions failed to deploy:$FAILED"
-            exit 1
-          fi
-          echo "✅ All Edge Functions deployed successfully!"
+          supabase functions deploy welcome-automation \
+            --project-ref pnohfokjlhpzrkczruju \
+            --no-verify-jwt
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy db-email-trigger
+        run: |
+          supabase functions deploy db-email-trigger \
+            --project-ref pnohfokjlhpzrkczruju \
+            --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Success
+        run: echo "✅ All Edge Functions deployed successfully!"

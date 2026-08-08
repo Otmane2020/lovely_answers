@@ -12,6 +12,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useActiveProject } from "@/hooks/useProjects";
 import { supabase } from "@/integrations/supabase/client";
+import { sanitizeHtml } from "@/lib/sanitize";
 import { format } from "date-fns";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -341,7 +342,7 @@ export default function AutoSeo() {
             {viewingArticle?.html_content || viewingArticle?.content ? (
               <article
                 className="editorial-prose max-w-none"
-                dangerouslySetInnerHTML={{ __html: (viewingArticle.html_content || viewingArticle.content || "")
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml((viewingArticle.html_content || viewingArticle.content || "")
                   .replace(/^[\s\S]*?<body[^>]*>/i, "")
                   .replace(/<\/body>[\s\S]*$/i, "")
                   .replace(/<!DOCTYPE[^>]*>/i, "")
@@ -350,7 +351,7 @@ export default function AutoSeo() {
                   .replace(/<\/?body[^>]*>/gi, "")
                   .replace(/```html\s*/gi, "")
                   .replace(/```\s*$/gi, "")
-                  .trim()
+                  .trim())
                 }}
               />
             ) : (

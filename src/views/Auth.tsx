@@ -1,27 +1,37 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import Link from "next/link";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { motion } from "framer-motion";
+import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Mail, Lock, User, ArrowRight, Loader2, Eye, EyeOff, Apple } from "lucide-react";
 import { lovable } from "@/integrations/lovable";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
-import { BrandMark, themeVars } from "@/components/brand/BrandMark";
+import { AnimatedLogo } from "@/components/AnimatedLogo";
 
 const emailSchema = z.string().email("Invalid email address");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
 
 export default function Auth() {
-  const navigate = useNavigate();
+  const router = useRouter();
+  const pathname = usePathname();
   const { user, signIn, signUp, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
-
-  const [searchParams] = useSearchParams();
-  const modeFromUrl = searchParams.get("mode");
-  const checkoutSuccess = searchParams.get("checkout") === "success";
-  const [isLogin, setIsLogin] = useState(modeFromUrl !== "signup");
-
+  
+  // Check URL params for signup mode and checkout success
+  const searchParams = useSearchParams();
+  const modeFromUrl = searchParams.get('mode');
+  const checkoutSuccess = searchParams.get('checkout') === 'success';
+  const nextParam = searchParams.get('next');
+  const [isLogin, setIsLogin] = useState(modeFromUrl !== 'signup');
+  
+  // Pre-fill email from onboarding if available (client-side only)
   const [email, setEmail] = useState("");
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [isResetPassword, setIsResetPassword] = useState(false);
@@ -32,54 +42,84 @@ export default function Auth() {
   const [fullName, setFullName] = useState("");
   const [errors, setErrors] = useState<{ email?: string; password?: string; confirmPassword?: string }>({});
 
+  // Load saved email from localStorage on client only
   useEffect(() => {
-    const saved = localStorage.getItem("onboarding_email");
+    const saved = localStorage.getItem('onboarding_email');
     if (saved) setEmail(saved);
   }, []);
 
+  // Force light theme on auth page
   useEffect(() => {
     document.documentElement.classList.remove("dark");
   }, []);
 
-  // Auth events: OAuth callback, password recovery.
+  // Listen for auth events (OAuth callback, password recovery, etc.)
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("[AUTH] Auth event:", event, "Session:", !!session);
+      
       if (event === "PASSWORD_RECOVERY") {
+        console.log("[AUTH] Password recovery detected, showing reset form");
         setIsResetPassword(true);
         return;
       }
-
+      
+      // Handle SIGNED_IN event - this fires after OAuth callback
       if (event === "SIGNED_IN" && session?.user) {
-        const u = session.user;
-        const isOAuth = u.app_metadata?.provider && u.app_metadata.provider !== "email";
-        const isNewUser = Date.now() - new Date(u.created_at).getTime() < 60000;
-
+        const user = session.user;
+        console.log("[AUTH] SIGNED_IN event for user:", user.id);
+        
+        const isOAuth = user.app_metadata?.provider && user.app_metadata.provider !== "email";
+        const createdAt = new Date(user.created_at);
+        const now = new Date();
+        const isNewUser = (now.getTime() - createdAt.getTime()) < 60000; // Created within last minute
+        
         if (isOAuth && isNewUser) {
+          console.log("[AUTH] New OAuth user detected, sending welcome email");
           try {
             await supabase.functions.invoke("send-email", {
               body: {
                 type: "welcome",
-                to: u.email,
-                name: u.user_metadata?.full_name || u.user_metadata?.name || u.email?.split("@")[0],
+                to: user.email,
+                name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0],
               },
             });
+            console.log("[AUTH] Welcome email sent for OAuth user");
           } catch (emailError) {
             console.error("[AUTH] Failed to send welcome email:", emailError);
           }
         }
+        
+        // For OAuth logins, trigger redirect check immediately
+        if (isOAuth) {
+          console.log("[AUTH] OAuth login detected, will redirect via useEffect");
+        }
       }
     });
 
+    // Check URL for recovery token (query params or hash)
     const checkRecoveryToken = () => {
+      // Check URL hash
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      if (hashParams.get("type") === "recovery") { setIsResetPassword(true); return; }
-
-      const qs = new URLSearchParams(window.location.search);
-      if (qs.get("type") === "recovery") { setIsResetPassword(true); return; }
-
-      const errorCode = hashParams.get("error_code") || qs.get("error_code");
-      const errorDescription = hashParams.get("error_description") || qs.get("error_description");
-      if (errorCode === "otp_expired" || errorDescription?.includes("expired")) {
+      if (hashParams.get('type') === 'recovery') {
+        console.log("[AUTH] Recovery type in hash, showing reset form");
+        setIsResetPassword(true);
+        return;
+      }
+      
+      // Check URL search params (new Supabase format)
+      const searchParams = new URLSearchParams(window.location.search);
+      if (searchParams.get('type') === 'recovery') {
+        console.log("[AUTH] Recovery type in search params, showing reset form");
+        setIsResetPassword(true);
+        return;
+      }
+      
+      // Check for error_code (expired/invalid token)
+      const errorCode = hashParams.get('error_code') || searchParams.get('error_code');
+      const errorDescription = hashParams.get('error_description') || searchParams.get('error_description');
+      if (errorCode === 'otp_expired' || errorDescription?.includes('expired')) {
+        console.log("[AUTH] Recovery token expired");
         toast({
           title: "Link expired",
           description: "The password reset link has expired. Please request a new one.",
@@ -87,16 +127,42 @@ export default function Auth() {
         });
       }
     };
-
+    
     checkRecoveryToken();
+
     return () => subscription.unsubscribe();
   }, [toast]);
 
-  // Signed in: project -> dashboard, no project -> onboarding.
   useEffect(() => {
-    if (isResetPassword || !user) return;
+    // Don't redirect if user is resetting password
+    if (isResetPassword) {
+      console.log("[AUTH] In password reset mode, not redirecting");
+      return;
+    }
 
     const checkUserAndRedirect = async () => {
+      if (!user) {
+        console.log("[AUTH] No user, staying on auth page");
+        return;
+      }
+
+      console.log("[AUTH] User found, checking subscription + projects...", user.id);
+
+      // GATE: require active subscription/trial before any app access
+      let hasAccess = false;
+      try {
+        const { data: sub } = await supabase.functions.invoke("check-subscription");
+        hasAccess = !!(sub?.subscribed || sub?.trial);
+      } catch (e) {
+        console.error("[AUTH] check-subscription failed", e);
+      }
+
+      if (!hasAccess && !checkoutSuccess) {
+        console.log("[AUTH] No active subscription/trial → /checkout");
+        window.location.replace(nextParam?.startsWith("/") ? nextParam : "/checkout?plan=pro&cycle=annual");
+        return;
+      }
+
       const { data: existingProjects, error } = await supabase
         .from("projects")
         .select("id")
@@ -108,18 +174,21 @@ export default function Auth() {
         return;
       }
 
-      localStorage.removeItem("onboarding_data");
-      localStorage.removeItem("onboarding_email");
-
       if (existingProjects && existingProjects.length > 0) {
-        navigate(checkoutSuccess ? "/geo?subscription=success" : "/geo", { replace: true });
-      } else {
-        navigate("/onboarding", { replace: true });
+        localStorage.removeItem('onboarding_data');
+        localStorage.removeItem('onboarding_email');
+        const target = checkoutSuccess ? "/dashboard?subscription=success" : "/dashboard";
+        window.location.replace(target);
+        return;
       }
+
+      localStorage.removeItem('onboarding_data');
+      localStorage.removeItem('onboarding_email');
+      window.location.replace("/wizard");
     };
 
     checkUserAndRedirect();
-  }, [user, navigate, isResetPassword, checkoutSuccess]);
+  }, [user, router, isResetPassword, checkoutSuccess, nextParam]);
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
@@ -150,16 +219,21 @@ export default function Auth() {
     e.preventDefault();
     if (!validateForm()) return;
     setIsLoading(true);
+    
     const { error } = await signUp(email, password, fullName);
-    setIsLoading(false);
-
+    
     if (error) {
+      setIsLoading(false);
       let message = error.message;
       if (error.message.includes("already registered")) message = "This email is already registered. Please sign in.";
       toast({ title: "Sign up failed", description: message, variant: "destructive" });
       return;
     }
-    toast({ title: "Account created!", description: "Setting up your workspace..." });
+
+    // Account created - the useEffect will handle redirect based on onboarding_data
+    toast({ title: "Account created!", description: "Setting up your project..." });
+    setIsLoading(false);
+    // Don't navigate here - let useEffect handle it based on onboarding_data in localStorage
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
@@ -171,16 +245,27 @@ export default function Auth() {
     }
     setErrors({});
     setIsLoading(true);
-
+    
+    // Use the current origin for redirect
+    const redirectUrl = `${window.location.origin}/auth`;
+    console.log("[AUTH] Password reset redirect URL:", redirectUrl);
+    
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth`,
+      redirectTo: redirectUrl,
     });
+    
     setIsLoading(false);
-
+    
     if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      console.error("[AUTH] Reset password error:", error);
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
       return;
     }
+    
     toast({
       title: "Check your email",
       description: "We've sent you a password reset link. Please check your inbox and spam folder.",
@@ -190,266 +275,418 @@ export default function Auth() {
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate password
     const passwordResult = passwordSchema.safeParse(password);
     if (!passwordResult.success) {
       setErrors({ password: passwordResult.error.errors[0].message });
       return;
     }
+    
+    // Check passwords match
     if (password !== confirmPassword) {
       setErrors({ confirmPassword: "Passwords do not match" });
       return;
     }
+    
     setErrors({});
     setIsLoading(true);
+    
     const { error } = await supabase.auth.updateUser({ password });
+    
     setIsLoading(false);
-
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-      return;
-    }
-    toast({ title: "Password updated!", description: "Your password has been successfully reset." });
-    setIsResetPassword(false);
-    window.history.replaceState({}, document.title, window.location.pathname);
-  };
-
-  const oauth = async (provider: "google" | "apple") => {
-    const { error } = await lovable.auth.signInWithOAuth(provider, {
-      redirect_uri: `${window.location.origin}/auth`,
-    });
+    
     if (error) {
       toast({
-        title: `${provider === "google" ? "Google" : "Apple"} sign in failed`,
+        title: "Error",
         description: error.message,
         variant: "destructive",
       });
+      return;
     }
+    
+    toast({
+      title: "Password updated!",
+      description: "Your password has been successfully reset.",
+    });
+    
+    setIsResetPassword(false);
+    // Clean up URL
+    window.history.replaceState({}, document.title, window.location.pathname);
   };
 
   if (authLoading) {
     return (
-      <div style={{ ...themeVars, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--paper)" }}>
-        <Loader2 style={{ width: 30, height: 30, color: "var(--primary)" }} className="animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
-  const title = isResetPassword
-    ? "Set a new password"
-    : isForgotPassword
-    ? "Reset your password"
-    : isLogin
-    ? "Sign in"
-    : "Create your account";
-
   return (
-    <div style={{ ...themeVars, minHeight: "100vh", display: "flex", background: "var(--paper)", fontFamily: "Inter, system-ui, sans-serif", color: "var(--ink)" }}>
-      {/* ---- Form panel ---- */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "48px 24px" }}>
-        <div style={{ width: "100%", maxWidth: "420px", margin: "0 auto" }}>
-          <Link to="/" style={{ display: "inline-block", marginBottom: "40px" }}>
-            <BrandMark size={38} withText />
+    <>
+      <Helmet>
+        <title>Sign In | AutoPilot Geo</title>
+        <meta name="description" content="Sign in to AutoPilot Geo to manage your AI visibility, AEO content, and Google search performance." />
+        <link rel="canonical" href="https://autopilotgeo.com/auth" />
+        <meta name="robots" content="noindex,follow" />
+      </Helmet>
+    <div className="min-h-screen bg-background flex">
+      {/* Left Panel - Auth Form */}
+      <div className="flex-1 flex flex-col justify-center px-8 py-12 lg:px-16">
+        <div className="w-full max-w-md mx-auto">
+          {/* Logo */}
+          <Link href="/" className="flex items-center mb-12">
+            <AnimatedLogo size="lg" />
           </Link>
 
-          <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: "30px", fontWeight: 700, letterSpacing: "-.01em", margin: "0 0 8px" }}>
-            {title}
-          </h1>
-
-          <p style={{ fontSize: "14.5px", color: "var(--ink-soft)", margin: "0 0 28px" }}>
-            {isResetPassword ? (
-              "Enter your new password below"
-            ) : isForgotPassword ? (
-              <>Remember your password? <button style={linkBtn} onClick={() => setIsForgotPassword(false)}>Sign in</button></>
-            ) : isLogin ? (
-              <>Don't have an account? <button style={linkBtn} onClick={() => navigate("/onboarding")}>Start free</button></>
-            ) : (
-              <>Already have an account? <button style={linkBtn} onClick={() => setIsLogin(true)}>Sign in</button></>
-            )}
-          </p>
-
-          {!isResetPassword && !isForgotPassword && (
-            <>
-              <button style={socialBtn} onClick={() => oauth("google")}>
-                <svg style={{ width: 18, height: 18 }} viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-                </svg>
-                Continue with Google
-              </button>
-              <button style={{ ...socialBtn, marginBottom: "22px" }} onClick={() => oauth("apple")}>
-                <svg style={{ width: 18, height: 18 }} viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M17.05 12.54c-.02-2.2 1.8-3.26 1.88-3.31-1.02-1.5-2.62-1.7-3.18-1.72-1.35-.14-2.64.8-3.33.8-.69 0-1.75-.78-2.87-.76-1.48.02-2.84.86-3.6 2.18-1.53 2.66-.39 6.6 1.1 8.76.73 1.06 1.6 2.25 2.74 2.2 1.1-.04 1.52-.71 2.85-.71 1.33 0 1.7.71 2.87.69 1.18-.02 1.93-1.08 2.65-2.14.84-1.23 1.18-2.42 1.2-2.48-.03-.01-2.3-.88-2.31-3.5zM14.88 5.6c.6-.73 1.01-1.75.9-2.76-.87.04-1.92.58-2.55 1.31-.56.64-1.05 1.68-.92 2.67.97.08 1.96-.49 2.57-1.22z" />
-                </svg>
-                Continue with Apple
-              </button>
-
-              <div style={{ display: "flex", alignItems: "center", gap: "12px", margin: "0 0 22px" }}>
-                <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
-                <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: ".1em", color: "var(--ink-soft)" }}>or</span>
-                <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
-              </div>
-            </>
-          )}
-
-          {/* ---- Reset password ---- */}
-          {isResetPassword ? (
-            <form onSubmit={handleResetPassword}>
-              <label style={labelStyle}>New password</label>
-              <div style={{ position: "relative" }}>
-                <input
-                  type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  style={inputStyle}
-                />
-                <button type="button" style={eyeBtn} onClick={() => setShowPassword((s) => !s)} aria-label="Toggle password">
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-              {errors.password && <p style={errStyle}>{errors.password}</p>}
-
-              <label style={labelStyle}>Confirm password</label>
-              <input
-                type={showPassword ? "text" : "password"}
-                placeholder="••••••••"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                style={inputStyle}
-              />
-              {errors.confirmPassword && <p style={errStyle}>{errors.confirmPassword}</p>}
-
-              <button type="submit" disabled={isLoading} style={{ ...goldBtn, opacity: isLoading ? 0.6 : 1 }}>
-                {isLoading ? "Updating…" : "Update password"}
-              </button>
-            </form>
-          ) : isForgotPassword ? (
-            /* ---- Forgot password ---- */
-            <form onSubmit={handleForgotPassword}>
-              <label style={labelStyle}>Email</label>
-              <input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} />
-              {errors.email && <p style={errStyle}>{errors.email}</p>}
-              <button type="submit" disabled={isLoading} style={{ ...goldBtn, opacity: isLoading ? 0.6 : 1 }}>
-                {isLoading ? "Sending…" : "Send reset link"}
-              </button>
-            </form>
-          ) : (
-            /* ---- Sign in / Sign up ---- */
-            <form onSubmit={isLogin ? handleSignIn : handleSignUp}>
-              {!isLogin && (
-                <>
-                  <label style={labelStyle}>Full name</label>
-                  <input type="text" placeholder="Jane Doe" value={fullName} onChange={(e) => setFullName(e.target.value)} style={inputStyle} />
-                </>
-              )}
-
-              <label style={labelStyle}>Email</label>
-              <input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} />
-              {errors.email && <p style={errStyle}>{errors.email}</p>}
-
-              <label style={labelStyle}>Password</label>
-              <div style={{ position: "relative" }}>
-                <input
-                  type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  style={inputStyle}
-                />
-                <button type="button" style={eyeBtn} onClick={() => setShowPassword((s) => !s)} aria-label="Toggle password">
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-              {errors.password && <p style={errStyle}>{errors.password}</p>}
-
-              {isLogin && (
-                <button type="button" style={{ ...linkBtn, display: "block", marginBottom: "18px", fontSize: "13px" }} onClick={() => setIsForgotPassword(true)}>
-                  Forgot password?
-                </button>
-              )}
-
-              <button type="submit" disabled={isLoading} style={{ ...goldBtn, opacity: isLoading ? 0.6 : 1 }}>
-                {isLoading ? "Please wait…" : isLogin ? "Sign in" : "Create account"}
-              </button>
-            </form>
-          )}
-
-          <p style={{ fontSize: "12px", color: "var(--ink-soft)", textAlign: "center", marginTop: "20px" }}>
-            <Link to="/terms" style={{ color: "inherit", textDecoration: "underline" }}>Terms</Link>
-            {" · "}
-            <Link to="/privacy" style={{ color: "inherit", textDecoration: "underline" }}>Privacy</Link>
-          </p>
-        </div>
-      </div>
-
-      {/* ---- Brand panel (desktop only) ---- */}
-      <div className="apg-auth-aside" style={{ flex: 1, background: "linear-gradient(150deg,var(--primary-deep),#2a377f)", color: "#fff", padding: "60px 56px", flexDirection: "column", justifyContent: "center", position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "absolute", top: "-80px", right: "-80px", opacity: 0.13, pointerEvents: "none" }}>
-          <BrandMark size={320} />
-        </div>
-        <p style={{ fontSize: "11.5px", fontWeight: 700, letterSpacing: ".16em", textTransform: "uppercase", color: "#e9dfa8", marginBottom: "18px" }}>
-          Win generative search
-        </p>
-        <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: "30px", lineHeight: 1.2, marginBottom: "18px", maxWidth: "440px" }}>
-          Buyers ask AI which brand to choose. Make sure it's yours.
-        </h2>
-        <p style={{ color: "#b7bce8", fontSize: "15px", lineHeight: 1.6, maxWidth: "420px", marginBottom: "38px" }}>
-          AutopilotGEO creates, optimizes and publishes the content that ChatGPT, Gemini and Perplexity
-          actually cite — every day, on autopilot.
-        </p>
-        <div style={{ display: "flex", gap: "38px", flexWrap: "wrap" }}>
-          {[["500+", "active sites ranking on AI"], ["★ 4.9/5", "founder reviews"], ["+60%", "avg traffic in 3 months"]].map(([n, l]) => (
-            <div key={n}>
-              <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "22px", fontWeight: 600 }}>{n}</div>
-              <div style={{ fontSize: "12px", color: "#b7bce8" }}>{l}</div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-8"
+          >
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">
+                {isResetPassword ? "Set new password" : isForgotPassword ? "Reset password" : isLogin ? "Sign in" : "Create an account"}
+              </h1>
+              <p className="mt-2 text-muted-foreground">
+                {isResetPassword ? (
+                  "Enter your new password below"
+                ) : isForgotPassword ? (
+                  <>
+                    Remember your password?{" "}
+                    <button
+                      onClick={() => setIsForgotPassword(false)}
+                      className="text-primary font-medium hover:underline"
+                    >
+                      Sign in
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {isLogin ? "Don't have an account? " : "Already have an account? "}
+                    {isLogin ? (
+                      <button
+                        onClick={() => router.push("/signup")}
+                        className="text-primary font-medium hover:underline"
+                      >
+                        Sign up
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setIsLogin(true)}
+                        className="text-primary font-medium hover:underline"
+                      >
+                        Sign in
+                      </button>
+                    )}
+                  </>
+                )}
+              </p>
             </div>
-          ))}
+
+            {/* Only show Google button and divider when not resetting password */}
+            {!isResetPassword && (
+              <>
+                {/* Social Auth Buttons */}
+                <div className="flex flex-col gap-3">
+                  <Button
+                    variant="outline"
+                    className="w-full h-12 gap-3 text-base font-medium border-primary/20 bg-primary/5 hover:bg-primary/10"
+                    onClick={async () => {
+                      // Redirect back to /auth so the useEffect can handle the redirect logic
+                      sessionStorage.removeItem("post_oauth_intent");
+                      const { error } = await lovable.auth.signInWithOAuth('google', {
+                        redirect_uri: `${window.location.origin}/auth`,
+                      });
+                      if (error) {
+                        toast({
+                          title: "Google sign in failed",
+                          description: error.message,
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+
+                      const { data: { session } } = await supabase.auth.getSession();
+                      if (session?.user) {
+                        if (nextParam?.startsWith("/")) {
+                          window.location.replace(nextParam);
+                          return;
+                        }
+                        const { data: sub } = await supabase.functions.invoke("check-subscription");
+                        if (!sub?.subscribed && !sub?.trial) {
+                          window.location.replace("/checkout?plan=pro&cycle=annual");
+                          return;
+                        }
+                        const { data: projects } = await supabase
+                          .from("projects")
+                          .select("id")
+                          .eq("user_id", session.user.id)
+                          .limit(1);
+                        window.location.replace(projects && projects.length > 0 ? "/dashboard" : "/wizard");
+                      }
+                    }}
+                  >
+                    <svg className="h-5 w-5" viewBox="0 0 24 24">
+                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    </svg>
+                    Continue with Google
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    className="w-full h-12 gap-3 text-base font-medium border-primary/20 bg-primary/5 hover:bg-primary/10"
+                    onClick={async () => {
+                      sessionStorage.removeItem("post_oauth_intent");
+                      const { error } = await lovable.auth.signInWithOAuth('apple', {
+                        redirect_uri: `${window.location.origin}/auth`,
+                      });
+                      if (error) {
+                        toast({
+                          title: "Apple sign in failed",
+                          description: error.message,
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                  >
+                    <Apple className="h-5 w-5" />
+                    Continue with Apple
+                  </Button>
+                </div>
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-border" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">or</span>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {isResetPassword ? (
+              <form onSubmit={handleResetPassword} className="space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="new-password" className="text-muted-foreground">New Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="new-password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="pl-10 pr-10 h-12 bg-muted/50 border-border"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-password" className="text-muted-foreground">Confirm Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="confirm-password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="pl-10 h-12 bg-muted/50 border-border"
+                      required
+                    />
+                  </div>
+                  {errors.confirmPassword && <p className="text-sm text-destructive">{errors.confirmPassword}</p>}
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full h-12 gap-2 bg-foreground text-background hover:bg-foreground/90 text-base font-medium"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <>
+                      Update password
+                      <ArrowRight className="h-4 w-4" />
+                    </>
+                  )}
+                </Button>
+              </form>
+            ) : isForgotPassword ? (
+              <form onSubmit={handleForgotPassword} className="space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-muted-foreground">Email</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="pl-10 h-12 bg-muted/50 border-border"
+                      required
+                    />
+                  </div>
+                  {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full h-12 gap-2 bg-foreground text-background hover:bg-foreground/90 text-base font-medium"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <>
+                      Send reset link
+                      <ArrowRight className="h-4 w-4" />
+                    </>
+                  )}
+                </Button>
+              </form>
+            ) : (
+              <>
+                <form onSubmit={isLogin ? handleSignIn : handleSignUp} className="space-y-5">
+                  {!isLogin && (
+                    <div className="space-y-2">
+                      <Label htmlFor="name" className="text-muted-foreground">Full name</Label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="name"
+                          type="text"
+                          placeholder="John Doe"
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          className="pl-10 h-12 bg-muted/50 border-border"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-muted-foreground">Email</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="you@example.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="pl-10 h-12 bg-muted/50 border-border"
+                        required
+                      />
+                    </div>
+                    {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="password" className="text-muted-foreground">Password</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="pl-10 pr-10 h-12 bg-muted/50 border-border"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
+                  </div>
+
+                  {isLogin && (
+                    <button 
+                      type="button" 
+                      onClick={() => setIsForgotPassword(true)}
+                      className="text-sm text-primary hover:underline"
+                    >
+                      Forgot password?
+                    </button>
+                  )}
+
+                  <Button
+                    type="submit"
+                    className="w-full h-12 gap-2 bg-foreground text-background hover:bg-foreground/90 text-base font-medium"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <>
+                        {isLogin ? "Sign in" : "Create account"}
+                        <ArrowRight className="h-4 w-4" />
+                      </>
+                    )}
+                  </Button>
+                </form>
+
+                {!isLogin && (
+                  <p className="text-xs text-center text-muted-foreground">
+                    By signing up, you agree to our Terms of Service and Privacy Policy.
+                  </p>
+                )}
+              </>
+            )}
+          </motion.div>
         </div>
       </div>
 
-      <style>{`
-        .apg-auth-aside{display:none;}
-        @media (min-width:900px){ .apg-auth-aside{display:flex;} }
-      `}</style>
+      {/* Right Panel - Dark Navy */}
+      <div className="hidden lg:flex w-1/2 bg-[hsl(222,47%,11%)] relative overflow-hidden items-center justify-center">
+        <div className="absolute top-1/3 left-1/4 w-[400px] h-[400px] bg-violet-500/10 rounded-full blur-[150px]" />
+        
+        <div className="relative z-10 p-12 max-w-md">
+          <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-8">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="h-14 w-14 rounded-full bg-gradient-to-br from-violet-500 to-blue-500 flex items-center justify-center text-white font-bold text-xl">
+                MK
+              </div>
+              <div>
+                <h3 className="font-bold text-lg text-white">Marcus Klein</h3>
+                <p className="text-violet-400 text-sm font-medium">Head of Content @TechFlow</p>
+              </div>
+            </div>
+            <blockquote className="space-y-4">
+              <p className="text-white/80 font-medium text-lg leading-relaxed">
+                "AutoPilot AEO transformed how we approach AI visibility. Our brand now appears in ChatGPT and Perplexity responses consistently."
+              </p>
+              <p className="text-white/40 text-sm leading-relaxed">
+                Within 3 months, we saw a 340% increase in AI-driven traffic.
+              </p>
+            </blockquote>
+          </div>
+        </div>
+      </div>
     </div>
+    </>
   );
 }
-
-const labelStyle: React.CSSProperties = {
-  display: "block", fontSize: "12.5px", fontWeight: 600, color: "var(--ink-soft)", marginBottom: "6px",
-};
-
-const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "12px 14px", fontSize: "14.5px", border: "1px solid var(--line)",
-  borderRadius: "10px", marginBottom: "14px", boxSizing: "border-box", fontFamily: "inherit",
-  background: "var(--surface)", color: "var(--ink)",
-};
-
-const goldBtn: React.CSSProperties = {
-  width: "100%", padding: "13px", fontSize: "15px", fontWeight: 600, fontFamily: "inherit",
-  background: "linear-gradient(120deg,#f3e3ad,#c79a2e)", color: "#3a2c05", border: "none",
-  borderRadius: "10px", cursor: "pointer",
-};
-
-const socialBtn: React.CSSProperties = {
-  width: "100%", padding: "12px", fontSize: "14px", fontWeight: 600, fontFamily: "inherit",
-  background: "var(--surface)", color: "var(--ink)", border: "1px solid var(--line)",
-  borderRadius: "10px", cursor: "pointer", display: "flex", alignItems: "center",
-  justifyContent: "center", gap: "10px", marginBottom: "10px",
-};
-
-const linkBtn: React.CSSProperties = {
-  background: "none", border: "none", padding: 0, font: "inherit", fontWeight: 600,
-  color: "var(--primary)", cursor: "pointer", textDecoration: "underline",
-};
-
-const eyeBtn: React.CSSProperties = {
-  position: "absolute", right: "12px", top: "20px", transform: "translateY(-50%)",
-  background: "none", border: "none", cursor: "pointer", color: "var(--ink-soft)", padding: 0,
-};
-
-const errStyle: React.CSSProperties = {
-  fontSize: "12.5px", color: "var(--red)", margin: "-8px 0 12px",
-};

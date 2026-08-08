@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscriptionContext } from "@/contexts/SubscriptionContext";
+import { useProjects } from "@/hooks/useProjects";
 import { Loader2 } from "lucide-react";
 
 interface ProtectedRouteProps {
@@ -10,10 +11,26 @@ interface ProtectedRouteProps {
   requireSubscription?: boolean;
 }
 
+// Routes that an authenticated user with no project is allowed to visit
+const NO_PROJECT_ALLOWED = [
+  "/wizard",
+  "/onboarding",
+  "/auth",
+  "/checkout",
+  "/pricing",
+  "/billing",
+  "/subscription",
+  "/thank-you",
+  "/support",
+  "/account",
+  "/settings",
+];
+
 export function ProtectedRoute({ children, requireSubscription = true }: ProtectedRouteProps) {
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
   const { isSubscribed, isTrial, isLoading: subLoading } = useSubscriptionContext();
+  const { data: projects, isLoading: projectsLoading } = useProjects();
   const pathname = usePathname();
 
   useEffect(() => {
@@ -21,6 +38,16 @@ export function ProtectedRoute({ children, requireSubscription = true }: Protect
       router.push("/auth");
     }
   }, [authLoading, user, router]);
+
+  // Redirect users without any project to the wizard
+  useEffect(() => {
+    if (!authLoading && user && !projectsLoading && projects && projects.length === 0) {
+      const isAllowed = NO_PROJECT_ALLOWED.some((p) => pathname?.startsWith(p));
+      if (!isAllowed) {
+        router.push("/wizard");
+      }
+    }
+  }, [authLoading, user, projectsLoading, projects, pathname, router]);
 
   useEffect(() => {
     if (!authLoading && !subLoading && user) {

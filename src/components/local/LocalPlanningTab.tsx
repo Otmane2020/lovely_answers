@@ -80,13 +80,12 @@ export function LocalPlanningTab({ businessName, businessId }: LocalPlanningTabP
     
     setPublishingId(answer.id);
     try {
-      // Get integration
+      // Get integration — prefer Google My Business if connected
       const { data: integrations } = await supabase
         .from("integrations")
         .select("*")
         .eq("project_id", project.id)
-        .eq("is_connected", true)
-        .limit(1);
+        .eq("is_connected", true);
 
       if (!integrations || integrations.length === 0) {
         // Just mark as public without CMS
@@ -103,22 +102,37 @@ export function LocalPlanningTab({ businessName, businessId }: LocalPlanningTabP
         return;
       }
 
-      const integration = integrations[0];
+      const gmb = integrations.find((i: any) => i.platform === "google_business");
+      const integration = gmb || integrations[0];
 
-      // Publish via cms-publish
-      const { data, error } = await supabase.functions.invoke("cms-publish", {
-        body: {
-          integrationId: integration.id,
-          content: {
-            title: answer.question,
-            body: `<article><h1>${answer.question}</h1><p>${answer.answer}</p></article>`,
-            type: "local-answer",
-            sourceId: answer.id,
+      let publishedUrl: string | null = null;
+
+      if (integration.platform === "google_business") {
+        const { data, error } = await supabase.functions.invoke("gmb-publish-post", {
+          body: {
+            projectId: project.id,
+            content: `${answer.question}\n\n${answer.answer}`,
+            type: "UPDATE",
           },
-        },
-      });
-
-      if (error) throw error;
+        });
+        if (error) throw error;
+        if (!data?.success) throw new Error(data?.error || "Failed to publish to Google Business");
+        publishedUrl = data?.results?.[0]?.post?.searchUrl || null;
+      } else {
+        const { data, error } = await supabase.functions.invoke("cms-publish", {
+          body: {
+            integrationId: integration.id,
+            content: {
+              title: answer.question,
+              body: `<article><h1>${answer.question}</h1><p>${answer.answer}</p></article>`,
+              type: "local-answer",
+              sourceId: answer.id,
+            },
+          },
+        });
+        if (error) throw error;
+        publishedUrl = data?.url || null;
+      }
 
       // Update local answer
       await supabase
@@ -126,12 +140,13 @@ export function LocalPlanningTab({ businessName, businessId }: LocalPlanningTabP
         .update({
           is_public: true,
           published_at: new Date().toISOString(),
-          published_url: data?.url || null,
+          published_url: publishedUrl,
         })
         .eq("id", answer.id);
 
-      toast.success("Published to CMS!");
+      toast.success(integration.platform === "google_business" ? "Published to Google Business!" : "Published to CMS!");
       refetch();
+
     } catch (error) {
       console.error("Error publishing:", error);
       toast.error("Failed to publish");

@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { authenticateCaller } from "../_shared/internal-auth.ts";
-import { chatCompletion } from "../_shared/ai-call.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,16 +12,29 @@ serve(async (req) => {
   }
 
   try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const dataforseoLogin = Deno.env.get("DATAFORSEO_LOGIN");
     const dataforseoPassword = Deno.env.get("DATAFORSEO_PASSWORD");
     const openrouterApiKey = Deno.env.get("OPENROUTER_API_KEY");
 
-    // Auth: browser calls carry a user JWT, backend orchestrators (onboarding
-    // pipeline, cron, Refresh Project Context) carry the service role key.
-    const caller = await authenticateCaller(req);
-    if (!caller.ok) {
+    // Auth check
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
       return new Response(
-        JSON.stringify({ error: caller.error || "Unauthorized" }),
+        JSON.stringify({ error: "Missing authorization header" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -59,12 +71,6 @@ serve(async (req) => {
     let targetAudiences: string[] = [];
     let keywords: string[] = [];
     let detectedLanguage = "en";
-    let recommendationExample = "";
-    let category = "";
-    // False until the main OpenRouter call actually succeeds and parses —
-    // lets the caller tell "real AI enrichment" apart from "description is
-    // still just the raw scraped meta tag because the AI call failed".
-    let aiEnriched = false;
 
     // Step 1: Fetch and analyze FULL website content
     console.log("[ANALYZE-WEBSITE] 📄 Fetching full website content...");
@@ -79,9 +85,6 @@ serve(async (req) => {
           "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
           "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
         },
-        // A slow/unresponsive target site must not hang onboarding's
-        // "Analyzing your site…" state forever.
-        signal: AbortSignal.timeout(15000),
       });
       
       if (siteResponse.ok) {
@@ -213,7 +216,7 @@ serve(async (req) => {
     console.log("[ANALYZE-WEBSITE] 📄 Total page content extracted:", pageContent.length, "chars");
 
     // Step 2: Use AI to analyze the FULL page content and find competitors + keywords
-    if ((openrouterApiKey || Deno.env.get("LOVABLE_API_KEY")) && pageContent.length > 50) {
+    if (openrouterApiKey && pageContent.length > 50) {
       try {
         console.log("[ANALYZE-WEBSITE] 🤖 Using AI to analyze full page content...");
         
@@ -255,19 +258,6 @@ TASKS:
 
 4. AUDIENCES: Identify 3 main target audiences IN ${langName}.
 
-5. RECOMMENDATION EXAMPLE: Write ONE short sentence, IN ${langName}, exactly how an AI assistant
-   (like ChatGPT) would naturally recommend this business to someone asking for a suggestion in
-   its category — conversational, first-person ("I'd recommend...", "Je te conseille...", etc
-   depending on ${langName}), mentioning what makes it a good pick. This is NOT the site description —
-   it's a spoken-style recommendation a chatbot would say out loud.
-
-6. CATEGORY: Classify this business into EXACTLY ONE of these six categories, based on
-   what it actually does (not keyword-matching — understand the business):
-   "Retail store" | "Local service" | "E-commerce" | "Restaurant" | "SaaS" | "Other"
-   A web design agency selling websites, a plumber, a consultant, a photographer — all
-   "Local service". A company selling software/subscriptions — "SaaS". A site selling
-   physical products online — "E-commerce". A physical shop's own site — "Retail store".
-
 IMPORTANT:
 - Competitors: return ONLY real, currently active domains of DIRECT competitors
 - Competitors must sell/offer the SAME type of product or service, not just be in the same broad category
@@ -284,27 +274,29 @@ Respond ONLY with this JSON (no explanation):
   "keywords": [{"keyword": "keyword in ${langName}", "intent": "informational"}],
   "description": "Professional enriched description in ${langName}...",
   "audiences": ["audience 1 in ${langName}", "audience 2", "audience 3"],
-  "recommendationExample": "Short spoken-style AI recommendation sentence in ${langName}...",
-  "category": "one of: Retail store | Local service | E-commerce | Restaurant | SaaS | Other",
   "language": "${detectedLanguage}"
 }`;
 
-        // Shared caller: OpenRouter free chain first, Lovable AI Gateway as
-        // fallback — onboarding must never fall back to the raw meta tag just
-        // because the free daily quota is exhausted.
-        const aiRes = await chatCompletion({
-          messages: [
-            { role: "system", content: "Tu es un expert SEO et en analyse de marché. Tu analyses le contenu des sites web pour extraire des informations stratégiques. Tu réponds uniquement avec du JSON valide." },
-            { role: "user", content: analysisPrompt },
-          ],
-          temperature: 0.3,
-          max_tokens: 4000,
+        const aiResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${openrouterApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-2.0-flash-exp:free",
+            messages: [
+              { role: "system", content: "Tu es un expert SEO et en analyse de marché. Tu analyses le contenu des sites web pour extraire des informations stratégiques. Tu réponds uniquement avec du JSON valide." },
+              { role: "user", content: analysisPrompt }
+            ],
+            temperature: 0.3,
+          }),
         });
 
-        {
-          const content = String(aiRes.choices?.[0]?.message?.content ?? "").trim();
-          console.log(`[ANALYZE-WEBSITE] 🤖 AI analysis via ${aiRes.provider}/${aiRes.model}:`, content.substring(0, 500) + "...");
-
+        if (aiResponse.ok) {
+          const aiData = await aiResponse.json();
+          const content = aiData.choices?.[0]?.message?.content?.trim() || "";
+          console.log("[ANALYZE-WEBSITE] 🤖 AI analysis response:", content.substring(0, 500) + "...");
           
           try {
             // Parse JSON response
@@ -340,30 +332,11 @@ Respond ONLY with this JSON (no explanation):
                 targetAudiences = parsed.audiences.slice(0, 3);
                 console.log("[ANALYZE-WEBSITE] ✅ AI found audiences:", targetAudiences);
               }
-
-              // Extract the spoken-style recommendation example
-              if (typeof parsed.recommendationExample === "string" && parsed.recommendationExample.length > 10) {
-                recommendationExample = parsed.recommendationExample;
-                console.log("[ANALYZE-WEBSITE] ✅ AI generated recommendation example");
-              }
-
-              // Extract the AI-classified category — understands what the
-              // business actually does, unlike the onboarding UI's own
-              // keyword-matching guess (which reads "site vitrine
-              // professionnel" and has no idea that's a web design service).
-              const validCategories = ["Retail store", "Local service", "E-commerce", "Restaurant", "SaaS", "Other"];
-              if (typeof parsed.category === "string" && validCategories.includes(parsed.category)) {
-                category = parsed.category;
-                console.log("[ANALYZE-WEBSITE] ✅ AI classified category:", category);
-              }
-
-              aiEnriched = true;
             }
           } catch (parseError) {
             console.error("[ANALYZE-WEBSITE] ⚠️ Error parsing AI response:", parseError);
           }
         }
-
       } catch (e) {
         console.error("[ANALYZE-WEBSITE] ⚠️ AI analysis error:", e);
       }
@@ -392,17 +365,12 @@ Réponds UNIQUEMENT avec un JSON array de domaines:
 
         const aiResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
           method: "POST",
-          signal: AbortSignal.timeout(25000),
           headers: {
             "Authorization": `Bearer ${openrouterApiKey}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "google/gemma-4-31b-it:free",
-            // Free models get rate-limited upstream constantly; OpenRouter falls back
-            // through this list automatically when one errors out.
-            models: ["google/gemma-4-31b-it:free", "google/gemma-4-26b-a4b-it:free", "nvidia/nemotron-3-super-120b-a12b:free"],
-            max_tokens: 4000,
+            model: "google/gemini-2.0-flash-exp:free",
             messages: [
               { role: "system", content: "Tu es un expert en analyse de marché et en identification de concurrents. Tu réponds uniquement avec du JSON valide." },
               { role: "user", content: prompt }
@@ -500,9 +468,6 @@ Réponds UNIQUEMENT avec un JSON array de domaines:
         targetAudiences,
         keywords,
         language: detectedLanguage,
-        recommendationExample,
-        category,
-        aiEnriched,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

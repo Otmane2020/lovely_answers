@@ -297,10 +297,10 @@ export default function AeoAnalytics() {
         {!isConnected ? (
            <Card className="p-8 border-dashed border-2 bg-primary/5">
              <div className="flex flex-col items-center text-center max-w-md mx-auto">
-               <div className="w-16 h-16 rounded-2xl bg-[#1a2058] flex items-center justify-center mb-4"><Search className="w-8 h-8 text-white" /></div>
+               <div className="w-16 h-16 rounded-2xl bg-[hsl(222,47%,11%)] flex items-center justify-center mb-4"><Search className="w-8 h-8 text-white" /></div>
               <h2 className="text-xl font-semibold mb-2">Connect Google Search Console</h2>
               <p className="text-muted-foreground mb-6">Analyze your AEO signals: impressions without clicks, question queries, and brand lift indicating AI exposure.</p>
-              <Button onClick={connectGSC} className="gap-2 bg-[#1a2058] hover:bg-[#232c66] text-white" disabled={isLoading}>{isLoading ? (<Loader2 className="w-4 h-4 animate-spin" />) : (<ExternalLink className="w-4 h-4" />)}Connect GSC</Button>
+              <Button onClick={connectGSC} className="gap-2 bg-[hsl(222,47%,11%)] hover:bg-[hsl(222,47%,15%)] text-white" disabled={isLoading}>{isLoading ? (<Loader2 className="w-4 h-4 animate-spin" />) : (<ExternalLink className="w-4 h-4" />)}Connect GSC</Button>
               <p className="text-xs text-muted-foreground mt-4">Read-only • Secure data • OAuth 2.0</p>
             </div>
           </Card>
@@ -353,14 +353,14 @@ export default function AeoAnalytics() {
                       <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center"><MousePointerClick className="w-5 h-5 text-white" /></div>
                     </div>
                   </Card>
-                  <Card className="p-5 bg-gradient-to-br from-[#1a2058]/10 to-transparent border-[#1a2058]/20">
+                  <Card className="p-5 bg-gradient-to-br from-[hsl(222,47%,11%)]/10 to-transparent border-[hsl(222,47%,11%)]/20">
                     <div className="flex items-start justify-between">
                       <div>
                         <p className="text-sm text-muted-foreground">AI Exposure Score</p>
                         <p className="text-3xl font-bold mt-1">{aeoSignals?.exposureScore || 0}</p>
-                        <div className="flex items-center gap-1 mt-2"><Zap className="w-4 h-4 text-[#2e3a8c]" /><span className="text-xs text-muted-foreground">Impressions ↑ CTR ↓ = AI exposure</span></div>
+                        <div className="flex items-center gap-1 mt-2"><Zap className="w-4 h-4 text-[hsl(222,47%,30%)]" /><span className="text-xs text-muted-foreground">Impressions ↑ CTR ↓ = AI exposure</span></div>
                       </div>
-                      <div className="w-10 h-10 rounded-xl bg-[#1a2058] flex items-center justify-center"><Target className="w-5 h-5 text-white" /></div>
+                      <div className="w-10 h-10 rounded-xl bg-[hsl(222,47%,11%)] flex items-center justify-center"><Target className="w-5 h-5 text-white" /></div>
                     </div>
                   </Card>
                   <Card className="p-5 bg-gradient-to-br from-emerald-500/5 to-transparent border-emerald-500/20">

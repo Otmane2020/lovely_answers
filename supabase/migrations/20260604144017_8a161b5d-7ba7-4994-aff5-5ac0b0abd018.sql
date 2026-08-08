@@ -1,0 +1,2 @@
+ALTER TABLE public.project_settings ALTER COLUMN publish_frequency SET DEFAULT 'daily';
+UPDATE public.project_settings SET publish_frequency = 'daily' WHERE publish_frequency IS NULL OR publish_frequency = '3x_week';

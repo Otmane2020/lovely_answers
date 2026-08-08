@@ -24,29 +24,44 @@ serve(async (req) => {
     const openrouterApiKey = Deno.env.get("OPENROUTER_API_KEY")!;
 
     const { url } = await req.json();
-    if (!url) {
+    if (!url || typeof url !== "string" || url.length > 2048) {
       return new Response(
-        JSON.stringify({ error: "URL is required" }),
+        JSON.stringify({ error: "Invalid URL" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     // Clean URL - normalize accented characters
     let cleanUrl = url.trim();
-    // Remove accents from URL (é→e, à→a, etc.) for domains with special chars
     cleanUrl = cleanUrl.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     if (!cleanUrl.startsWith("http")) {
       cleanUrl = `https://${cleanUrl}`;
     }
 
     let domain: string;
+    let parsedUrl: URL;
     try {
-      domain = new URL(cleanUrl).hostname.replace("www.", "");
+      parsedUrl = new URL(cleanUrl);
+      domain = parsedUrl.hostname.replace("www.", "");
     } catch {
       return new Response(
         JSON.stringify({ error: "Invalid URL format" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // SSRF guard
+    if (!/^https?:$/.test(parsedUrl.protocol)) {
+      return new Response(JSON.stringify({ error: "Only http(s) URLs are allowed" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const host = parsedUrl.hostname.toLowerCase();
+    const blockedHostPatterns = [
+      /^localhost$/i, /\.localhost$/i, /^127\./, /^10\./, /^192\.168\./,
+      /^172\.(1[6-9]|2\d|3[0-1])\./, /^169\.254\./, /^0\./, /^::1$/, /^fc/, /^fd/,
+      /^metadata\.google\.internal$/i,
+    ];
+    if (blockedHostPatterns.some((re) => re.test(host))) {
+      return new Response(JSON.stringify({ error: "Private/internal hosts are not allowed" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     console.log(`[free-audit] Starting audit for ${cleanUrl} (domain: ${domain})`);
@@ -215,11 +230,7 @@ Rules:
         "X-Title": "AutoPilot Geo Audit",
       },
       body: JSON.stringify({
-        model: "google/gemma-4-31b-it:free",
-        // Free models get rate-limited upstream constantly; OpenRouter falls back
-        // through this list automatically when one errors out.
-        models: ["google/gemma-4-31b-it:free", "google/gemma-4-26b-a4b-it:free", "nvidia/nemotron-3-super-120b-a12b:free"],
-        max_tokens: 4000,
+        model: "google/gemini-2.0-flash-exp:free",
         messages: [
           { role: "system", content: "You are an SEO & AEO expert auditor. Always respond with valid JSON arrays only. Never wrap in markdown code blocks." },
           { role: "user", content: auditPrompt },

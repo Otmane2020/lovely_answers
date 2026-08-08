@@ -599,7 +599,7 @@ async function extractAudiencesFast(description: string, content: string, langua
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemma-4-31b-it:free', // Fastest model
+        model: 'google/gemini-2.0-flash-exp:free', // Fastest model
         messages: [{
           role: 'user',
           content: `Extract 4 specific target audiences for this business. ${langInstruction}
@@ -659,7 +659,7 @@ async function detectBusinessType(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemma-4-31b-it:free',
+        model: 'google/gemini-2.0-flash-exp:free',
         messages: [{
           role: 'user',
           content: `Analyze this business and return a SHORT search query (max 6 words) to find similar competitors.
@@ -891,7 +891,7 @@ async function extractKeywordsFast(description: string, content: string, brandNa
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemma-4-31b-it:free',
+        model: 'google/gemini-2.0-flash-exp:free',
         messages: [{
           role: 'user',
           content: `Extract 18-22 SEO/AEO keywords for this business. ${langInstruction}
@@ -1073,7 +1073,7 @@ async function scoreCompetitorSimilarity(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemma-4-31b-it:free',
+        model: 'google/gemini-2.0-flash-exp:free',
         messages: [{
           role: 'user',
           content: `Score each competitor by business similarity (0-100). ${langInstruction}
@@ -1448,7 +1448,7 @@ async function generateQaAndSeoTitlesFromCompetitors(
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'google/gemma-4-31b-it:free',
+          model: 'google/gemini-2.0-flash-exp:free',
           messages: [
             {
               role: 'user',
@@ -1544,7 +1544,7 @@ async function findCompetitorsViaAI(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemma-4-31b-it:free',
+        model: 'google/gemini-2.0-flash-exp:free',
         messages: [{
           role: 'user',
           content: `List 4-6 DIRECT competitor websites for this business. ${langInstr}

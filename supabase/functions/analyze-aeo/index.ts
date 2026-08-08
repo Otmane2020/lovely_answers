@@ -270,10 +270,7 @@ serve(async (req) => {
         "X-Title": "AutoPilot Geo Premium Audit",
       },
       body: JSON.stringify({
-        model: "google/gemma-4-31b-it:free",
-        // Free models get rate-limited upstream constantly; OpenRouter falls back
-        // through this list automatically when one errors out.
-        models: ["google/gemma-4-31b-it:free", "google/gemma-4-26b-a4b-it:free", "nvidia/nemotron-3-super-120b-a12b:free"],
+        model: "google/gemini-2.0-flash-exp:free",
         messages: [
           { role: "system", content: buildSystemPrompt() },
           {
@@ -295,7 +292,7 @@ Analyse ce contenu réel et génère un rapport complet avec des données SPÉCI
           },
         ],
         temperature: 0.3,
-        max_tokens: 4000,
+        max_tokens: 8000,
       }),
     });
 

@@ -311,11 +311,12 @@ export default function Audit() {
       <Helmet>
         <title>Free AEO & SEO Audit | AutoPilot Geo</title>
         <meta name="description" content="Get a free comprehensive SEO and AEO audit for your website. Find out how to rank on ChatGPT, Gemini, and Google." />
+        <link rel="canonical" href="https://autopilotgeo.com/seo-audit" />
       </Helmet>
 
       <div className="min-h-screen bg-white">
         {/* Header - Dark */}
-        <header className="border-b border-white/10 bg-[#1a2058]/90 backdrop-blur-xl sticky top-0 z-50">
+        <header className="border-b border-white/10 bg-[hsl(222,47%,11%)]/90 backdrop-blur-xl sticky top-0 z-50">
           <div className="container flex h-16 items-center justify-between px-4">
             <Link href="/" className="flex items-center">
               <AnimatedLogo size="md" />
@@ -324,7 +325,7 @@ export default function Audit() {
               <Button variant="ghost" size="sm" className="text-white/70 hover:text-white hover:bg-white/10" asChild>
                 <Link href="/auth">Login</Link>
               </Button>
-              <Button size="sm" className="bg-white text-[#1a2058] hover:bg-white/90" asChild>
+              <Button size="sm" className="bg-white text-[hsl(222,47%,11%)] hover:bg-white/90" asChild>
                 <Link href="/onboarding">
                   <Sparkles className="h-4 w-4 mr-1" />
                   Start Free
@@ -335,7 +336,7 @@ export default function Audit() {
         </header>
 
         {/* Hero - Dark */}
-        <div className="bg-[#1a2058] pt-8 pb-12">
+        <div className="bg-[hsl(222,47%,11%)] pt-8 pb-12">
           <div className="container px-4 max-w-4xl mx-auto">
             <div className="text-center mb-8">
               <Badge className="mb-4 bg-white/10 text-white/70 border-white/20">
@@ -368,7 +369,7 @@ export default function Audit() {
               <Button
                 type="submit"
                 disabled={isLoading || !websiteUrl.trim()}
-                className="h-13 px-6 gap-2 bg-white text-[#1a2058] hover:bg-white/90"
+                className="h-13 px-6 gap-2 bg-white text-[hsl(222,47%,11%)] hover:bg-white/90"
               >
                 {isLoading ? (
                   <>

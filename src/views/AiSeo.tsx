@@ -89,21 +89,21 @@ const steps = [
 
 const testimonials = [
   {
-    name: "Mike R.",
-    role: "Roofing Company Owner",
-    text: "Impressions up 180%, clicks up 90% in 3 months. Now I sell it to my own clients as a managed service.",
+    name: "Ben M.",
+    role: "Founder, AutoPilot GEO",
+    text: "I used AutoPilot GEO on my own projects. The blog now drives 60 organic visits/month from Google with zero manual effort.",
     rating: 5,
   },
   {
-    name: "David M.",
-    role: "SaaS Founder",
-    text: "It's nice knowing the blog and SEO aren't neglected. The articles are great and totally in context!",
+    name: "500+ active sites",
+    role: "Across all plans",
+    text: "Our users publish thousands of AI-optimized articles every month. Average traffic lift: +60% in 3 months.",
     rating: 5,
   },
   {
-    name: "Ryan G.",
-    role: "Agency Owner",
-    text: "Canceled $1,200/mo in tools. Now paying $29/month and getting better rankings.",
+    name: "4.9 / 5",
+    role: "289 reviews on TrustAvis",
+    text: "Rated Excellent by our customers — independent reviews collected via TrustAvis.",
     rating: 5,
   },
 ];
@@ -146,10 +146,10 @@ export default function AiSeo() {
   return (
     <>
       <Helmet>
-        <title>AI SEO Services – Get Found by ChatGPT, Gemini & Google | AutoPilot Geo</title>
+        <title>AI SEO Services – Get Found by ChatGPT & Google</title>
         <meta
           name="description"
-          content="AI SEO services that get your brand recommended by ChatGPT, Gemini, Perplexity and Google. Automated content, keyword research, and AI visibility monitoring. Start free."
+          content="AI SEO services to get your brand recommended by ChatGPT, Gemini, Perplexity & Google. Automated content and visibility monitoring."
         />
         <link rel="canonical" href="https://autopilotgeo.com/ai-seo" />
         <meta property="og:title" content="AI SEO Services – Get Found by AI Search Engines" />
@@ -185,7 +185,7 @@ export default function AiSeo() {
 
       <div className="min-h-screen bg-background">
         {/* Nav */}
-        <nav className="fixed top-0 z-50 w-full border-b border-white/10 bg-[#1a2058]/90 backdrop-blur-xl">
+        <nav className="fixed top-0 z-50 w-full border-b border-white/10 bg-[hsl(222,47%,11%)]/90 backdrop-blur-xl">
           <div className="container flex h-16 items-center justify-between px-4">
             <Link href="/" className="flex items-center">
               <AnimatedLogo size="md" />
@@ -197,7 +197,7 @@ export default function AiSeo() {
               <Button variant="ghost" className="text-white/70 hover:text-white hover:bg-white/10 hidden sm:inline-flex" asChild>
                 <Link href="/auth">Log in</Link>
               </Button>
-              <Button className="bg-white text-[#1a2058] hover:bg-white/90 font-semibold" asChild>
+              <Button className="bg-white text-[hsl(222,47%,11%)] hover:bg-white/90 font-semibold" asChild>
                 <Link href="/onboarding">Start Free Trial</Link>
               </Button>
             </div>
@@ -205,7 +205,7 @@ export default function AiSeo() {
         </nav>
 
         {/* ═══ HERO ═══ */}
-        <section className="relative overflow-hidden bg-[#1a2058] pt-28 md:pt-36 pb-20 md:pb-28">
+        <section className="relative overflow-hidden bg-[hsl(222,47%,11%)] pt-28 md:pt-36 pb-20 md:pb-28">
           <div className="absolute top-1/3 left-1/4 w-[500px] h-[500px] bg-blue-400/10 rounded-full blur-[150px]" />
           <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-indigo-500/8 rounded-full blur-[120px]" />
 
@@ -248,7 +248,7 @@ export default function AiSeo() {
               >
                 <Button
                   size="lg"
-                  className="h-13 px-8 bg-white text-[#1a2058] hover:bg-white/90 text-base font-bold gap-2 shadow-lg"
+                  className="h-13 px-8 bg-white text-[hsl(222,47%,11%)] hover:bg-white/90 text-base font-bold gap-2 shadow-lg"
                   onClick={() => router.push("/onboarding")}
                 >
                   Get Your Free AI SEO Audit
@@ -281,7 +281,7 @@ export default function AiSeo() {
                   { name: "Perplexity", logo: perplexityLogo },
                   { name: "Claude", logo: claudeLogo },
                 ].map((p) => (
-                  <img key={p.name} src={p.logo as unknown as string} alt={p.name} className="h-7 w-7 rounded-lg opacity-50 hover:opacity-80 transition-opacity" />
+                  <img key={p.name} src={p.logo as unknown as string} alt={`${p.name} AI logo`} className="h-7 w-7 rounded-lg opacity-50 hover:opacity-80 transition-opacity" />
                 ))}
               </motion.div>
             </div>
@@ -289,7 +289,7 @@ export default function AiSeo() {
         </section>
 
         {/* ═══ RESULTS BAR ═══ */}
-        <section className="bg-[#232c66] border-y border-white/5 py-10">
+        <section className="bg-[hsl(222,47%,14%)] border-y border-white/5 py-10">
           <div className="container px-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto">
               {results.map((r, i) => (
@@ -313,7 +313,7 @@ export default function AiSeo() {
         <section className="bg-white py-20 md:py-28">
           <div className="container px-4">
             <div className="text-center mb-14">
-              <h2 className="text-3xl md:text-4xl font-bold text-[#1a2058] mb-4">
+              <h2 className="text-3xl md:text-4xl font-bold text-[hsl(222,47%,11%)] mb-4">
                 Everything you need for AI SEO
               </h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
@@ -330,7 +330,7 @@ export default function AiSeo() {
                   transition={{ delay: i * 0.08 }}
                   className="rounded-xl border border-border bg-card p-6 hover:shadow-lg transition-shadow"
                 >
-                  <div className="inline-flex items-center justify-center w-11 h-11 rounded-lg bg-[#1a2058]/5 text-[#1a2058] mb-4">
+                  <div className="inline-flex items-center justify-center w-11 h-11 rounded-lg bg-[hsl(222,47%,11%)]/5 text-[hsl(222,47%,11%)] mb-4">
                     {b.icon}
                   </div>
                   <h3 className="text-lg font-semibold text-foreground mb-2">{b.title}</h3>
@@ -342,10 +342,10 @@ export default function AiSeo() {
         </section>
 
         {/* ═══ HOW IT WORKS ═══ */}
-        <section className="bg-[#eef0fb] py-20 md:py-28">
+        <section className="bg-[hsl(222,47%,97%)] py-20 md:py-28">
           <div className="container px-4">
             <div className="text-center mb-14">
-              <h2 className="text-3xl md:text-4xl font-bold text-[#1a2058] mb-4">
+              <h2 className="text-3xl md:text-4xl font-bold text-[hsl(222,47%,11%)] mb-4">
                 How AI SEO works
               </h2>
               <p className="text-lg text-muted-foreground">Get started in under 2 minutes. No technical skills required.</p>
@@ -360,7 +360,7 @@ export default function AiSeo() {
                   transition={{ delay: i * 0.15 }}
                   className="text-center"
                 >
-                  <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-[#1a2058] text-white text-xl font-bold mb-5">
+                  <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-[hsl(222,47%,11%)] text-white text-xl font-bold mb-5">
                     {s.step}
                   </div>
                   <h3 className="text-lg font-semibold text-foreground mb-2">{s.title}</h3>
@@ -372,7 +372,7 @@ export default function AiSeo() {
             <div className="text-center mt-12">
               <Button
                 size="lg"
-                className="h-13 px-8 bg-[#1a2058] text-white hover:bg-[#232c66] text-base font-bold gap-2"
+                className="h-13 px-8 bg-[hsl(222,47%,11%)] text-white hover:bg-[hsl(222,47%,16%)] text-base font-bold gap-2"
                 onClick={() => router.push("/onboarding")}
               >
                 Start Your Free AI SEO Audit
@@ -386,7 +386,7 @@ export default function AiSeo() {
         <section className="bg-white py-20 md:py-28">
           <div className="container px-4">
             <div className="text-center mb-14">
-              <h2 className="text-3xl md:text-4xl font-bold text-[#1a2058] mb-4">
+              <h2 className="text-3xl md:text-4xl font-bold text-[hsl(222,47%,11%)] mb-4">
                 Trusted by businesses worldwide
               </h2>
               <p className="text-lg text-muted-foreground">Real results from real AI SEO customers.</p>
@@ -418,7 +418,7 @@ export default function AiSeo() {
         </section>
 
         {/* ═══ PRICING CTA ═══ */}
-        <section className="bg-[#1a2058] py-20 md:py-28">
+        <section className="bg-[hsl(222,47%,11%)] py-20 md:py-28">
           <div className="container px-4">
             <div className="mx-auto max-w-3xl text-center">
               <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
@@ -431,7 +431,7 @@ export default function AiSeo() {
               <div className="inline-flex flex-col sm:flex-row gap-3 mb-8">
                 <Button
                   size="lg"
-                  className="h-13 px-8 bg-white text-[#1a2058] hover:bg-white/90 text-base font-bold gap-2"
+                  className="h-13 px-8 bg-white text-[hsl(222,47%,11%)] hover:bg-white/90 text-base font-bold gap-2"
                   onClick={() => router.push("/onboarding")}
                 >
                   Get Started Free
@@ -460,7 +460,7 @@ export default function AiSeo() {
         <section className="bg-white py-20 md:py-28">
           <div className="container px-4">
             <div className="text-center mb-14">
-              <h2 className="text-3xl md:text-4xl font-bold text-[#1a2058] mb-4">
+              <h2 className="text-3xl md:text-4xl font-bold text-[hsl(222,47%,11%)] mb-4">
                 AI SEO – Frequently Asked Questions
               </h2>
             </div>

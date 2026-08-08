@@ -85,8 +85,26 @@ export default {
     const url = new URL(request.url);
     const userAgent = request.headers.get('User-Agent') || '';
     const pathname = url.pathname;
+    // Dynamic sitemap.xml → proxy to Supabase edge function (includes all blog/answers)
+    if (pathname === '/sitemap.xml') {
+      try {
+        const smRes = await fetch('https://pnohfokjlhpzrkczruju.supabase.co/functions/v1/sitemap');
+        if (smRes.ok) {
+          return new Response(await smRes.text(), {
+            headers: {
+              'Content-Type': 'application/xml; charset=utf-8',
+              'Cache-Control': 'public, max-age=3600',
+              'X-Sitemap-Source': 'dynamic',
+            },
+          });
+        }
+      } catch (e) {
+        console.error('Sitemap proxy error:', e);
+      }
+    }
 
     // Bot + prerenderable path → serve SSR from Supabase
+
     if (isBot(userAgent) && shouldPrerender(pathname)) {
       try {
         const prerenderReq = new Request(

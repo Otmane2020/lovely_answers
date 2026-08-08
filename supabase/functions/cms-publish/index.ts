@@ -14,12 +14,112 @@ interface PublishRequest {
   content?: {
     title: string;
     body: string;
-    type: "answer" | "article";
+    excerpt?: string;
+    slug?: string;
+    type: "answer" | "article" | "local-answer";
     sourceId: string;
   };
   // Legacy support
   platform?: string;
   credentials?: Record<string, string>;
+  // Internal: marks a recursive duplicate-language publish to prevent loops
+  _duplicateLang?: "fr" | "en";
+}
+
+// ───────── ranki.ai dual-language duplicate publishing ─────────
+// For projects whose website_url contains "ranki.ai", every publish is
+// duplicated in the opposite language (FR ↔ EN) via OpenRouter.
+const RANKI_DOMAIN_MATCH = "ranki.ai";
+
+async function translateContent(
+  title: string,
+  body: string,
+  targetLang: "fr" | "en"
+): Promise<{ title: string; body: string } | null> {
+  const apiKey = Deno.env.get("OPENROUTER_API_KEY");
+  if (!apiKey) {
+    console.error("[cms-publish] OPENROUTER_API_KEY missing — cannot translate");
+    return null;
+  }
+  const langName = targetLang === "fr" ? "French" : "English";
+  const sys = `You are a professional SEO translator. Translate the given blog post to natural, fluent ${langName}. PRESERVE all HTML tags exactly. Do NOT add commentary. Return strict JSON: {"title":"...","body":"..."}.`;
+  const user = `Translate to ${langName}.\n\nTITLE:\n${title}\n\nBODY (HTML):\n${body}`;
+  try {
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-2.0-flash-exp:free",
+        temperature: 0.2,
+        messages: [
+          { role: "system", content: sys },
+          { role: "user", content: user },
+        ],
+      }),
+    });
+    const json = await res.json();
+    const content = json?.choices?.[0]?.message?.content ?? "";
+    const match = content.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error("No JSON in translation response");
+    const parsed = JSON.parse(match[0]);
+    if (!parsed.title || !parsed.body) throw new Error("Incomplete translation payload");
+    return { title: String(parsed.title), body: String(parsed.body) };
+  } catch (e) {
+    console.error("[cms-publish] Translation failed:", e);
+    return null;
+  }
+}
+
+function normalizeEditorialBody(input: string): string {
+  let html = (input || "").trim();
+  if (!html) return "";
+  html = html.replace(/<!doctype[^>]*>/gi, "");
+  html = html.replace(/<\/?(?:html|head|body)[^>]*>/gi, "");
+  html = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "");
+  html = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "");
+  html = html.replace(/<h1[^>]*>[\s\S]*?<\/h1>/gi, "");
+  html = html.replace(/<\/?(?:article|section)[^>]*>/gi, "");
+  html = html.replace(/<\/?header[^>]*>[\s\S]*?<\/header>/gi, "");
+  html = html.replace(/<\/?footer[^>]*>[\s\S]*?<\/footer>/gi, "");
+  html = html.replace(/<meta[^>]*>/gi, "");
+  html = html.replace(/\sstyle\s*=\s*"[^"]*"/gi, "");
+  html = html.replace(/\sstyle\s*=\s*'[^']*'/gi, "");
+
+  // Repair stray/unclosed heading tags by normalizing through markdown markers
+  html = html.replace(/<\s*h([2-6])[^>]*>([\s\S]*?)<\s*\/\s*h\1\s*>/gi,
+    (_m, lvl, inner) => `\n\n${"#".repeat(Number(lvl))} ${String(inner).trim()}\n\n`);
+  html = html.replace(/<\s*h([2-6])[^>]*>/gi, (_m, lvl) => `\n\n${"#".repeat(Number(lvl))} `);
+  html = html.replace(/<\s*\/\s*h[2-6]\s*>/gi, "\n\n");
+
+  // Inline markdown headings (AI often returns a single-line blob with `## ...  next sentence`)
+  html = html.replace(/\s+(#{2,6})\s+([^\n]+?)(?=\s{2,}|\s+#{2,6}\s+|\n|$)/g,
+    (_m, hashes, txt) => `\n\n${hashes} ${txt.trim()}\n\n`);
+  // Line-start headings
+  html = html.replace(/(^|\n)\s*#{2}\s+(.+)$/gm, "$1<h2>$2</h2>");
+  html = html.replace(/(^|\n)\s*#{3}\s+(.+)$/gm, "$1<h3>$2</h3>");
+  html = html.replace(/(^|\n)\s*#{4}\s+(.+)$/gm, "$1<h4>$2</h4>");
+
+  html = html.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
+
+  // Bullet lists from inline "* " patterns → ul
+  html = html.replace(/\s+\*\s{2,}/g, "\n* ");
+  html = html.replace(/(?<=[.:])\s+\*\s+(?=\*\*|[A-Z])/g, "\n* ");
+  html = html.replace(/(?:(?:^|\n)\*\s+[^\n]+){2,}/g, (block) => {
+    const items = block.trim().split(/\n\*\s+/).filter(Boolean).map((s) => s.replace(/^\*\s+/, ""));
+    return "\n\n<ul>" + items.map((i) => `<li>${i.trim()}</li>`).join("") + "</ul>\n\n";
+  });
+
+  // Paragraph break on double-space after sentence end
+  html = html.replace(/([.!?])\s{2,}(?=[A-Z"*<])/g, "$1\n\n");
+
+  html = html.replace(/(^|\n)\s*(Opening Summary|Comparison Criteria|Tool Solutions for Enterprise Content Strategy|Brand|ChatGPT \(OpenAI\)|Gemini \(Google\)|Perplexity AI|Comparison Table|How to Choose the Right AI for Your Enterprise|FAQ)\s*$/gmi, "$1<h2>$2</h2>");
+  html = html.split(/\n{2,}/).map((chunk) => {
+    const text = chunk.trim();
+    if (!text) return "";
+    if (/^<(h[1-6]|p|ul|ol|li|blockquote|table|thead|tbody|tr|div|details|summary)/i.test(text)) return text;
+    return `<p>${text.replace(/\n+/g, "<br>")}</p>`;
+  }).filter(Boolean).join("\n\n");
+  return html.replace(/\n{3,}/g, "\n\n").trim();
 }
 
 serve(async (req) => {
@@ -162,16 +262,18 @@ serve(async (req) => {
     
     let platform: string;
     let config: Record<string, string>;
-    let content: { title: string; body: string };
+    let content: { title: string; body: string; excerpt?: string; slug?: string };
+    let projectWebsiteUrl: string | null = null;
+    let projectLanguage: string | null = null;
 
     // New flow: use integrationId to get stored config
     if (requestData.integrationId) {
       console.log(`[cms-publish] Using integration ${requestData.integrationId}`);
-      
-      // SECURITY: Fetch integration WITH project user_id for ownership verification
+
+      // SECURITY: Fetch integration WITH project user_id + website_url + language
       const { data: integration, error: intError } = await supabase
         .from("integrations")
-        .select("*, projects!inner(user_id)")
+        .select("*, projects!inner(user_id, website_url, language)")
         .eq("id", requestData.integrationId)
         .single();
 
@@ -196,11 +298,16 @@ serve(async (req) => {
 
       platform = integration.platform;
       config = integration.config as Record<string, string>;
+      const proj = integration.projects as { user_id: string; website_url: string | null; language: string | null };
+      projectWebsiteUrl = proj?.website_url || null;
+      projectLanguage = proj?.language || null;
 
       if (requestData.content) {
         content = {
           title: requestData.content.title,
           body: requestData.content.body,
+          excerpt: requestData.content.excerpt,
+          slug: requestData.content.slug,
         };
       } else {
         throw new Error("Content is required");
@@ -270,6 +377,10 @@ serve(async (req) => {
       case "lovable":
         publishResult = await publishToLovable(content, config, requestData.content?.sourceId);
         break;
+      case "google_business":
+        // Google Business is handled separately via gmb-publish-post, skip here
+        publishResult = { success: true, publishedUrl: null };
+        break;
       default:
         throw new Error(`Unsupported platform: ${platform}`);
     }
@@ -333,6 +444,52 @@ serve(async (req) => {
       }
     }
 
+    // ───────── ranki.ai: duplicate publish in the opposite language ─────────
+    let duplicateResult: { success: boolean; publishedUrl?: string; lang?: string; message?: string } | null = null;
+    if (
+      publishResult.success &&
+      !requestData._duplicateLang &&
+      projectWebsiteUrl &&
+      projectWebsiteUrl.toLowerCase().includes(RANKI_DOMAIN_MATCH)
+    ) {
+      const sourceLang = (projectLanguage || "en").toLowerCase().startsWith("fr") ? "fr" : "en";
+      const targetLang: "fr" | "en" = sourceLang === "fr" ? "en" : "fr";
+      console.log(`[cms-publish] ranki.ai detected — duplicating publish ${sourceLang} → ${targetLang}`);
+      try {
+        const translated = await translateContent(content.title, content.body, targetLang);
+        if (translated) {
+          const dupContent: { title: string; body: string; excerpt?: string; slug?: string } = {
+            title: translated.title,
+            body: translated.body,
+            excerpt: content.excerpt,
+            slug: content.slug ? `${content.slug}-${targetLang}` : undefined,
+          };
+          let dupPublish: { success: boolean; publishedUrl?: string; publishedId?: string; message?: string };
+          switch (platform) {
+            case "wordpress": dupPublish = await publishToWordPress(dupContent, config); break;
+            case "webflow":   dupPublish = await publishToWebflow(dupContent, config); break;
+            case "shopify":   dupPublish = await publishToShopify(dupContent, config); break;
+            case "wix":       dupPublish = await publishToWix(dupContent, config); break;
+            case "webhook":
+            case "framer":
+            case "snapps":    dupPublish = await publishToWebhook(dupContent, config); break;
+            case "api":       dupPublish = await publishToCustomApi(dupContent, config); break;
+            case "duda":      dupPublish = await publishToDuda(dupContent, config); break;
+            case "bigcommerce": dupPublish = await publishToBigCommerce(dupContent, config); break;
+            case "lovable":   dupPublish = await publishToLovable(dupContent, config, requestData.content?.sourceId); break;
+            default:          dupPublish = { success: false, message: `Duplicate skipped (unsupported platform ${platform})` };
+          }
+          duplicateResult = { ...dupPublish, lang: targetLang };
+          console.log(`[cms-publish] Duplicate (${targetLang}) result:`, dupPublish);
+        } else {
+          duplicateResult = { success: false, lang: targetLang, message: "Translation failed" };
+        }
+      } catch (dupErr) {
+        console.error("[cms-publish] Duplicate publish error (non-blocking):", dupErr);
+        duplicateResult = { success: false, lang: targetLang, message: dupErr instanceof Error ? dupErr.message : "Unknown error" };
+      }
+    }
+
     console.log(`[cms-publish] Result: ${JSON.stringify(publishResult)}`);
 
     return new Response(
@@ -343,6 +500,7 @@ serve(async (req) => {
         publishedId: publishResult.publishedId,
         message: publishResult.message,
         publishedAt: new Date().toISOString(),
+        duplicate: duplicateResult,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
@@ -393,18 +551,33 @@ async function publishToWordPress(
     
     console.log(`[WordPress] Using Basic Auth for user: ${username}`);
     
-    const response = await fetch(`${siteUrl}/wp-json/wp/v2/posts`, {
-      method: "POST",
-      headers: {
-        Authorization: authHeader,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        title: content.title,
-        content: content.body,
-        status: "publish",
-      }),
+    const postBody = JSON.stringify({
+      title: content.title,
+      content: content.body,
+      excerpt: (content as any).excerpt || undefined,
+      slug: (content as any).slug || undefined,
+      status: "publish",
     });
+    const postHeaders = {
+      Authorization: authHeader,
+      "Content-Type": "application/json",
+    };
+
+    // Try pretty permalinks first, then fall back to plain (?rest_route=)
+    let response = await fetch(`${siteUrl}/wp-json/wp/v2/posts`, {
+      method: "POST",
+      headers: postHeaders,
+      body: postBody,
+    });
+    if (response.status === 404) {
+      console.log(`[WordPress] /wp-json 404, falling back to ?rest_route=`);
+      response = await fetch(`${siteUrl}/?rest_route=/wp/v2/posts`, {
+        method: "POST",
+        headers: postHeaders,
+        body: postBody,
+      });
+    }
+
 
     if (!response.ok) {
       const status = response.status;
@@ -865,16 +1038,18 @@ async function publishToLovable(
             .substring(0, 80); // Limit length
         }
         
+        const normalizedBody = normalizeEditorialBody(content.body);
         const response = await fetch(config.endpoint, {
           method: "POST",
           headers,
           body: JSON.stringify({
             title: content.title,
-            body: content.body,
+            body: normalizedBody,
             slug: articleSlug,
             sourceId: sourceId,
             publishedAt: new Date().toISOString(),
             source: "AutoPilot Geo",
+            renderMode: "magazine",
           }),
         });
         
@@ -885,29 +1060,38 @@ async function publishToLovable(
         }
         
         const data = await response.json().catch(() => ({}));
-        console.log(`[Lovable] Published to external Lovable project with slug: ${articleSlug}`);
-        
-        // Build the public URL using siteUrl if available, otherwise try to extract from data or fallback
-        let publicUrl = data.url;
-        if (!publicUrl && config.siteUrl) {
-          // Use the configured site URL
-          const baseUrl = config.siteUrl.replace(/\/+$/, ''); // Remove trailing slashes
-          publicUrl = `${baseUrl}/blog/${articleSlug}`;
-        } else if (!publicUrl && sourceId) {
-          // Try to get website_url from the project
+        console.log(`[Lovable] Published to external Lovable project with slug: ${articleSlug}`, JSON.stringify(data).slice(0, 300));
+
+        // ALWAYS prefer the project's own website_url over whatever the receiving
+        // endpoint returns (some receivers return a wrong/stale lovable.app domain).
+        // Priority: config.siteUrl > project.website_url > data.article?.url || data.url > fallback
+        let publicUrl: string | undefined;
+
+        if (config.siteUrl) {
+          publicUrl = `${config.siteUrl.replace(/\/+$/, '')}/blog/${articleSlug}`;
+        } else if (sourceId) {
           const { data: answerProject } = await supabase
             .from("answers")
             .select("projects(website_url)")
             .eq("id", sourceId)
             .single();
-          const projectUrl = (answerProject?.projects as any)?.website_url;
+          let projectUrl = (answerProject?.projects as any)?.website_url;
+          if (!projectUrl) {
+            const { data: articleProject } = await supabase
+              .from("articles")
+              .select("projects(website_url)")
+              .eq("id", sourceId)
+              .single();
+            projectUrl = (articleProject?.projects as any)?.website_url;
+          }
           if (projectUrl) {
             publicUrl = `${projectUrl.replace(/\/+$/, '')}/blog/${articleSlug}`;
-          } else {
-            publicUrl = `/blog/${articleSlug}`;
           }
-        } else if (!publicUrl) {
-          publicUrl = `/blog/${articleSlug}`;
+        }
+
+        // Last-resort fallbacks: response payload, then relative path
+        if (!publicUrl) {
+          publicUrl = data.article?.url || data.url || `/blog/${articleSlug}`;
         }
         
         return {
@@ -1019,18 +1203,7 @@ async function publishToLovable(
       console.log(`[Lovable] Stripped full HTML document wrapper`);
     }
     
-    // Remove <h1> tags (title is rendered separately by ArticleTemplate)
-    cleanBody = cleanBody.replace(/<h1[^>]*>[\s\S]*?<\/h1>/gi, '').trim();
-    
-    // Remove header/footer/meta elements that ArticleTemplate provides
-    cleanBody = cleanBody.replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '');
-    cleanBody = cleanBody.replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '');
-    cleanBody = cleanBody.replace(/<meta[^>]*>/gi, '');
-    cleanBody = cleanBody.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-    cleanBody = cleanBody.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
-    
-    // Clean up excessive whitespace
-    cleanBody = cleanBody.replace(/\n{3,}/g, '\n\n').trim();
+    cleanBody = normalizeEditorialBody(cleanBody);
     
     // === CRITICAL: Insert into published_articles so the blog page can find it ===
     const metaDescription = cleanBody

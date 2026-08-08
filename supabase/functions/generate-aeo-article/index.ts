@@ -1,8 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { loadGenerationContext } from "../_shared/project-context.ts";
-import { chatCompletion } from "../_shared/ai-call.ts";
-
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -107,8 +104,8 @@ ${JSON.stringify(faqSchema, null, 2)}
   
   <style>
     :root {
-      --primary: #2e3a8c;
-      --primary-light: #5f6ce0;
+      --primary: #7c3aed;
+      --primary-light: #a78bfa;
       --bg: #ffffff;
       --surface: #f8fafc;
       --surface-alt: #f1f5f9;
@@ -418,8 +415,6 @@ interface BusinessContext {
   businessType: string;
   competitors: string[];
   tone: string;
-  /** Rendered project_context blocks (business, website, keywords, questions...). */
-  contextBlocks?: string;
 }
 
 // Generate article content using OpenRouter AI with proper SEO structure and settings
@@ -432,7 +427,6 @@ async function generateArticleContentWithSettings(
   settings: ArticleSettings
 ): Promise<{ content: string; meta_description: string; keywords: string[] }> {
   const { brandName, websiteUrl, businessDescription, audience, businessType, competitors, tone } = context;
-  const projectContextBlocks = context.contextBlocks || "";
   
   // Build dynamic instructions based on settings
   const wordRange = settings.articleLength <= 1500 ? "1000-1500" : 
@@ -484,8 +478,7 @@ ${businessDescription ? `- Description: ${businessDescription}` : ""}
 ${audience ? `- Audience cible: ${audience}` : ""}
 ${businessType ? `- Type d'activité: ${businessType}` : ""}
 ${competitors?.length > 0 ? `- Concurrents à différencier: ${competitors.join(", ")}` : ""}
-${tone ? `- Ton de voix: ${tone}` : ""}
-${projectContextBlocks ? `\n${projectContextBlocks}\n\nAEO ARTICLE : article long extractible par les moteurs de réponse. Ancre chaque section dans les pages, l'offre et l'audience réelles ci-dessus. Aucun contenu générique.` : ""}`;
+${tone ? `- Ton de voix: ${tone}` : ""}`;
 
   const businessContextEn = `
 BUSINESS CONTEXT (use this information to personalize the article):
@@ -495,8 +488,7 @@ ${businessDescription ? `- Description: ${businessDescription}` : ""}
 ${audience ? `- Target audience: ${audience}` : ""}
 ${businessType ? `- Business type: ${businessType}` : ""}
 ${competitors?.length > 0 ? `- Competitors to differentiate from: ${competitors.join(", ")}` : ""}
-${tone ? `- Tone of voice: ${tone}` : ""}
-${projectContextBlocks ? `\n${projectContextBlocks}\n\nAEO ARTICLE: long-form answer content built to be extracted by answer engines. Ground every section in the real pages, offering and audience above. No generic filler.` : ""}`;
+${tone ? `- Tone of voice: ${tone}` : ""}`;
 
   const systemPrompt = language === 'fr'
     ? `Tu es un expert en rédaction AEO (Answer Engine Optimization). Tu génères des articles optimisés pour être CITÉS par ChatGPT, Gemini, Perplexity et autres IA.
@@ -726,33 +718,42 @@ Reply in JSON:
   "keywords": ["main keyword", "secondary keyword 1", "secondary keyword 2", "secondary keyword 3"]
 }`;
 
-  const data = await chatCompletion({
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt }
-    ],
-    temperature: 0.55,
-    max_tokens: 4000,
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
+      temperature: 0.55,
+      max_tokens: 8000,
+    }),
   });
 
+  if (!response.ok) {
+    throw new Error(`AI API error: ${response.status}`);
+  }
+
+  const data = await response.json();
   const content = data.choices?.[0]?.message?.content || "";
   
-  return safeParseJSON<{ content: string; meta_description: string; keywords: string[] }>(
-    content, 
-    { content, meta_description: "", keywords: [] }
-  );
-}
-
-// Safe JSON parsing with fallback
-function safeParseJSON<T>(raw: string, fallback: T): T {
-  const match = raw.match(/\{[\s\S]*\}/);
-  if (!match) return fallback;
+  // NO FALLBACK - require strict JSON from the AI
+  const match = content.match(/\{[\s\S]*\}/);
+  if (!match) {
+    throw new Error("AI did not return valid JSON for article");
+  }
   try {
-    return JSON.parse(match[0]);
-  } catch {
-    return fallback;
+    return JSON.parse(match[0]) as { content: string; meta_description: string; keywords: string[] };
+  } catch (e) {
+    throw new Error(`AI returned malformed JSON for article: ${(e as Error).message}`);
   }
 }
+
 
 // Generate slug for articles
 function generateArticleSlug(text: string): string {
@@ -786,29 +787,24 @@ serve(async (req) => {
       });
     }
 
+    // Create client with user's auth header for getClaims
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+    
     const token = authHeader.replace("Bearer ", "");
-    // The daily planning cron calls this with the service role key (no
-    // human session behind it) to generate the AEO article for an answer
-    // it just created unattended — skip the user/ownership check for that
-    // case, same pattern used elsewhere for cron-callable functions.
-    const isServiceRole = token === supabaseServiceKey;
-    let userId: string | null = null;
-    if (!isServiceRole) {
-      // Create client with user's auth header for getClaims
-      const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
-        global: { headers: { Authorization: authHeader } }
+    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
+    
+    if (claimsError || !claimsData?.claims?.sub) {
+      console.error("[generate-aeo-article] Auth error:", claimsError);
+      return new Response(JSON.stringify({ error: "Invalid JWT" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
-      const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
-      if (claimsError || !claimsData?.claims?.sub) {
-        console.error("[generate-aeo-article] Auth error:", claimsError);
-        return new Response(JSON.stringify({ error: "Invalid JWT" }), {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      userId = claimsData.claims.sub as string;
     }
 
+    const userId = claimsData.claims.sub;
+    
     // Use service role client for DB operations
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -830,10 +826,8 @@ serve(async (req) => {
       });
     }
 
-    // Verify ownership (skipped for the service-role/cron caller — there's
-    // no end user to own the request, the answer's own project_id is trust
-    // enough since it was itself created by the same cron for this project).
-    if (userId && answer.projects?.user_id !== userId) {
+    // Verify ownership
+    if (answer.projects?.user_id !== userId) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -860,13 +854,6 @@ serve(async (req) => {
       competitors: genSettings?.competitors || answer.projects?.competitors || [],
       tone: genSettings?.tone || ""
     };
-
-    // Fail-safe project context — generation continues even if DataForSEO is down.
-    {
-      const { blocks, readiness, degraded } = await loadGenerationContext(supabase, answer.project_id, { maxKeywords: 20 });
-      businessContext.contextBlocks = blocks;
-      console.log(`[generate-aeo-article] context readiness=${readiness} degraded=${degraded.join(" | ") || "none"}`);
-    }
 
     console.log(`[generate-aeo-article] Business context loaded:`, {
       brandName: businessContext.brandName,

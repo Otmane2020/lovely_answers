@@ -17,7 +17,7 @@ export default function Terms() {
 
       <div className="min-h-screen">
         {/* Navigation */}
-        <nav className="fixed top-0 z-50 w-full border-b border-white/10 bg-[#1a2058]/90 backdrop-blur-xl">
+        <nav className="fixed top-0 z-50 w-full border-b border-white/10 bg-[hsl(222,47%,11%)]/90 backdrop-blur-xl">
           <div className="container flex h-16 items-center justify-between">
             <Link href="/" className="flex items-center">
               <AnimatedLogo size="md" />
@@ -29,7 +29,7 @@ export default function Terms() {
         </nav>
 
         {/* Hero bar */}
-        <div className="bg-[#1a2058] pt-28 pb-12">
+        <div className="bg-[hsl(222,47%,11%)] pt-28 pb-12">
           <div className="container max-w-3xl">
             <h1 className="text-4xl font-bold text-white">Terms of Service</h1>
             <p className="text-white/40 mt-2">Last updated: January 2026</p>
@@ -41,15 +41,15 @@ export default function Terms() {
           <div className="container max-w-3xl">
             <div className="space-y-8 text-gray-500">
               <section className="space-y-3">
-                <h2 className="text-2xl font-semibold text-[#1a2058]">1. Agreement to Terms</h2>
+                <h2 className="text-2xl font-semibold text-[hsl(222,47%,11%)]">1. Agreement to Terms</h2>
                 <p>By accessing or using AutoPilot Geo's services, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our services.</p>
               </section>
               <section className="space-y-3">
-                <h2 className="text-2xl font-semibold text-[#1a2058]">2. Description of Service</h2>
+                <h2 className="text-2xl font-semibold text-[hsl(222,47%,11%)]">2. Description of Service</h2>
                 <p>AutoPilot Geo provides Answer Engine Optimization (AEO) services, including AI-generated content, SEO optimization, and content publishing tools.</p>
               </section>
               <section className="space-y-3">
-                <h2 className="text-2xl font-semibold text-[#1a2058]">3. Subscription and Payment</h2>
+                <h2 className="text-2xl font-semibold text-[hsl(222,47%,11%)]">3. Subscription and Payment</h2>
                 <p>We offer a 3-day free trial for new users. After the trial period, you will be charged according to the subscription plan you selected.</p>
                 <ul className="list-disc pl-6 space-y-2">
                   <li>Subscriptions are billed monthly</li>
@@ -58,20 +58,20 @@ export default function Terms() {
                 </ul>
               </section>
               <section className="space-y-3">
-                <h2 className="text-2xl font-semibold text-[#1a2058]">4. Content Ownership</h2>
+                <h2 className="text-2xl font-semibold text-[hsl(222,47%,11%)]">4. Content Ownership</h2>
                 <p>All content generated through our platform belongs to you. You retain full rights to use, modify, and distribute the content as you see fit.</p>
               </section>
               <section className="space-y-3">
-                <h2 className="text-2xl font-semibold text-[#1a2058]">5. Acceptable Use</h2>
+                <h2 className="text-2xl font-semibold text-[hsl(222,47%,11%)]">5. Acceptable Use</h2>
                 <p>You agree not to use our services to generate content that is illegal, harmful, or violates third-party rights.</p>
               </section>
               <section className="space-y-3">
-                <h2 className="text-2xl font-semibold text-[#1a2058]">6. Contact</h2>
+                <h2 className="text-2xl font-semibold text-[hsl(222,47%,11%)]">6. Contact</h2>
                 <p>For any questions regarding these terms, please contact us at <a href="mailto:support@autopilotgeo.com" className="text-violet-600 hover:underline">support@autopilotgeo.com</a></p>
               </section>
               <section className="space-y-3">
-                <h2 className="text-2xl font-semibold text-[#1a2058]">7. Company Information</h2>
-                <p>AutoPilot Geo Ltd<br />Suite 4, Piccadilly House<br />Manchester, M1 1AB<br />United Kingdom</p>
+                <h2 className="text-2xl font-semibold text-[hsl(222,47%,11%)]">7. Company Information</h2>
+                <p>AutoPilot Geo Ltd — Contact: <a href="mailto:support@autopilotgeo.com" className="text-violet-600 hover:underline">support@autopilotgeo.com</a></p>
               </section>
             </div>
           </div>

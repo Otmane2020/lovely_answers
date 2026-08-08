@@ -104,6 +104,10 @@ export default function Blog() {
         <title>Blog - AI-Optimized Answers | AutoPilot Geo</title>
         <meta name="description" content="Discover AI-optimized answers and insights. Expert content designed for maximum visibility across AI platforms." />
         <link rel="canonical" href="https://autopilotgeo.com/blog" />
+        <meta property="og:title" content="Blog - AI-Optimized Answers | AutoPilot Geo" />
+        <meta property="og:description" content="Expert content designed for maximum visibility across AI platforms." />
+        <meta property="og:url" content="https://autopilotgeo.com/blog" />
+        <meta property="og:type" content="website" />
         <script type="application/ld+json">{JSON.stringify(blogStructuredData)}</script>
       </Helmet>
 
@@ -122,7 +126,7 @@ export default function Blog() {
         </header>
 
         {/* Hero Section - Dark */}
-        <section className="py-16 md:py-24 bg-[#1a2058]">
+        <section className="py-16 md:py-24 bg-[hsl(222,47%,11%)]">
           <div className="container">
             <div className="max-w-3xl mx-auto text-center">
               <Badge className="mb-4 bg-white/10 text-white/70 border-white/20">
@@ -132,18 +136,66 @@ export default function Blog() {
               <h1 className="text-4xl md:text-5xl font-bold mb-4 text-white">
                 Expert Answers & Insights
               </h1>
-              <p className="text-xl text-white/50 mb-8">
+              <p className="text-xl text-white/80 mb-8">
                 Discover content optimized for AI visibility. Each article is crafted to rank first in AI-powered search engines.
               </p>
               <div className="relative max-w-md mx-auto">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/75" />
                 <Input
+                  aria-label="Search articles"
                   placeholder="Search articles..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/30"
+                  className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/75"
                 />
               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Featured Guides */}
+        <section className="bg-white pt-12">
+          <div className="container space-y-6">
+            <div className="max-w-4xl mx-auto rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 to-white p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <Badge className="mb-3 bg-violet-100 text-violet-700 border-violet-200">Featured Guide</Badge>
+                <h2 className="text-xl md:text-2xl font-bold text-[hsl(222,47%,11%)] mb-2">
+                  <Link href="/blog/aeo-vs-geo" className="hover:text-violet-700 transition-colors">
+                    AEO vs GEO: What Is the Difference Between Answer Engine and Generative Engine Optimization?
+                  </Link>
+                </h2>
+                <p className="text-gray-700 text-sm max-w-xl">
+                  A side-by-side comparison of answer engine optimization and generative engine optimization, with tactics for ranking in voice assistants and AI search summaries.
+                </p>
+              </div>
+              <Link
+                href="/blog/aeo-vs-geo"
+                className="inline-flex items-center gap-2 text-violet-700 font-semibold text-sm shrink-0 hover:gap-3 transition-all"
+                aria-label="Read the AEO vs GEO comparison guide"
+              >
+                Read the AEO vs GEO guide <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+
+            <div className="max-w-4xl mx-auto rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <Badge className="mb-3 bg-emerald-100 text-emerald-700 border-emerald-200">Featured Guide</Badge>
+                <h2 className="text-xl md:text-2xl font-bold text-[hsl(222,47%,11%)] mb-2">
+                  <Link href="/blog/measuring-geo-success" className="hover:text-emerald-700 transition-colors">
+                    How to Measure the Success of Generative Engine Optimization Campaigns
+                  </Link>
+                </h2>
+                <p className="text-gray-700 text-sm max-w-xl">
+                  A complete framework for tracking AI citation share, brand sentiment in LLM responses, and conversion attribution from generative search.
+                </p>
+              </div>
+              <Link
+                href="/blog/measuring-geo-success"
+                className="inline-flex items-center gap-2 text-emerald-700 font-semibold text-sm shrink-0 hover:gap-3 transition-all"
+                aria-label="Read the GEO success metrics guide"
+              >
+                Read the GEO metrics guide <ArrowRight className="h-4 w-4" />
+              </Link>
             </div>
           </div>
         </section>
@@ -151,6 +203,7 @@ export default function Blog() {
         {/* Articles Grid - White */}
         <section className="py-16 bg-white">
           <div className="container">
+
             {isLoading ? (
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {[...Array(6)].map((_, i) => (
@@ -159,23 +212,23 @@ export default function Blog() {
               </div>
             ) : filteredAnswers.length === 0 ? (
               <div className="text-center py-16">
-                <FileText className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                <h2 className="text-2xl font-semibold mb-2 text-[#1a2058]">{searchQuery ? "No articles found" : "No articles yet"}</h2>
-                <p className="text-gray-500 mb-6">{searchQuery ? "Try adjusting your search terms" : "Check back soon for AI-optimized content"}</p>
+                <FileText className="h-16 w-16 text-gray-500 mx-auto mb-4" />
+                <h2 className="text-2xl font-semibold mb-2 text-[hsl(222,47%,11%)]">{searchQuery ? "No articles found" : "No articles yet"}</h2>
+                <p className="text-gray-700 mb-6">{searchQuery ? "Try adjusting your search terms" : "Check back soon for AI-optimized content"}</p>
                 {searchQuery && <Button variant="outline" onClick={() => setSearchQuery("")}>Clear Search</Button>}
               </div>
             ) : (
               <>
                 <div className="flex items-center justify-between mb-8">
-                  <p className="text-gray-500">{filteredAnswers.length} article{filteredAnswers.length !== 1 ? "s" : ""}</p>
+                  <p className="text-gray-700">{filteredAnswers.length} article{filteredAnswers.length !== 1 ? "s" : ""}</p>
                 </div>
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                   {filteredAnswers.map((answer) => (
-                    <Link key={answer.id} href={`/blog/${answer.slug}`}>
+                    <Link key={answer.id} href={`/blog/${answer.slug}`} aria-label={`Read article: ${answer.question}`}>
                       <Card className="h-full hover:shadow-lg transition-shadow group cursor-pointer border-gray-200">
                         <CardHeader>
                           <div className="flex items-start justify-between gap-2">
-                            <CardTitle className="text-lg leading-tight group-hover:text-violet-600 transition-colors text-[#1a2058]">
+                            <CardTitle className="text-lg leading-tight group-hover:text-violet-600 transition-colors text-[hsl(222,47%,11%)]">
                               {answer.question}
                             </CardTitle>
                             {answer.score && answer.score >= 80 && (
@@ -184,16 +237,16 @@ export default function Blog() {
                           </div>
                         </CardHeader>
                         <CardContent>
-                          <p className="text-gray-500 text-sm mb-4 line-clamp-3">
+                          <p className="text-gray-700 text-sm mb-4 line-clamp-3">
                             {truncateText(answer.answer.replace(/<[^>]*>/g, ""), 150)}
                           </p>
-                          <div className="flex items-center justify-between text-xs text-gray-400">
+                          <div className="flex items-center justify-between text-xs text-gray-600">
                             <div className="flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
                               {format(new Date(answer.published_at), "MMM d, yyyy")}
                             </div>
                             <div className="flex items-center gap-1 text-violet-600 group-hover:translate-x-1 transition-transform">
-                              Read more <ArrowRight className="h-3 w-3" />
+                              <span>Read {truncateText(answer.question, 32)}</span> <ArrowRight className="h-3 w-3" aria-hidden="true" />
                             </div>
                           </div>
                         </CardContent>
@@ -207,13 +260,13 @@ export default function Blog() {
         </section>
 
         {/* CTA - Dark */}
-        <section className="py-16 bg-[#1a2058]">
+        <section className="py-16 bg-[hsl(222,47%,11%)]">
           <div className="container">
             <div className="max-w-2xl mx-auto text-center">
               <h2 className="text-3xl font-bold mb-4 text-white">Want AI-Optimized Content for Your Business?</h2>
-              <p className="text-white/50 mb-8">AutoPilot Geo helps you create content that ranks first in AI search engines.</p>
+              <p className="text-white/80 mb-8">AutoPilot Geo helps you create content that ranks first in AI search engines.</p>
               <Link href="/auth">
-                <Button size="lg" className="gap-2 bg-white text-[#1a2058] hover:bg-white/90">
+                <Button size="lg" className="gap-2 bg-white text-[hsl(222,47%,11%)] hover:bg-white/90">
                   Get Started Free <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>

@@ -107,7 +107,8 @@ export function usePublishAnswer() {
       return { 
         results, 
         successCount: successfulPublishes.length, 
-        failCount: failedPublishes.length 
+        failCount: failedPublishes.length,
+        publishedUrl: firstSuccessUrl || null
       };
     },
     onSuccess: (data) => {

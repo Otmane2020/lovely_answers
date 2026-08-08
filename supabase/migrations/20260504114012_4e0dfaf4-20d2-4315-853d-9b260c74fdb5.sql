@@ -1,0 +1,1 @@
+ALTER TABLE public.project_settings ADD COLUMN IF NOT EXISTS human_review_enabled boolean DEFAULT false;

@@ -85,13 +85,13 @@ export default function ShoppingPlanning() {
 
       {/* Auto Schedule CTA */}
       {optimizedProducts.length > 0 && (
-        <Card className="bg-[#1a2058] border-white/10 p-6">
+        <Card className="bg-[hsl(222,47%,11%)] border-white/10 p-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div>
               <h3 className="text-lg font-bold text-white">Auto-Schedule Products</h3>
               <p className="text-white/60 text-sm">Distribute {optimizedProducts.length} optimized products over the next {optimizedProducts.length} days</p>
             </div>
-            <Button onClick={handleAutoSchedule} disabled={scheduling} className="bg-white text-[#1a2058] hover:bg-white/90">
+            <Button onClick={handleAutoSchedule} disabled={scheduling} className="bg-white text-[hsl(222,47%,11%)] hover:bg-white/90">
               {scheduling ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CalendarDays className="w-4 h-4 mr-2" />}
               Schedule All
             </Button>

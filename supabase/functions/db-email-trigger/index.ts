@@ -4,7 +4,6 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const FROM_EMAIL = "AutoPilot Geo <support@autopilotgeo.com>";
 const ADMIN_EMAIL = "support@autopilotgeo.com";
-const SIGNUP_NOTIFICATION_EMAIL = "oben.rockman@gmail.com";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -39,16 +38,9 @@ serve(async (req: Request): Promise<Response> => {
 
         await sendEmail({
           to: profile.email,
-          subject: "Bienvenue sur AutoPilot Geo! 🎉",
+          subject: "Welcome to AutoPilot Geo! 🎉",
           html: generateWelcomeEmail(profile.full_name || profile.email.split("@")[0]),
         });
-
-        // Notify admin of the new registration
-        await sendEmail({
-          to: SIGNUP_NOTIFICATION_EMAIL,
-          subject: `🆕 Nouvel utilisateur inscrit: ${profile.email}`,
-          html: generateNewUserNotification(profile),
-        }).catch((err) => console.error("[db-email-trigger] signup notification error:", err));
 
         // Trigger AI welcome call + WhatsApp (fire & forget)
         const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -71,7 +63,7 @@ serve(async (req: Request): Promise<Response> => {
       
       await sendEmail({
         to: ADMIN_EMAIL,
-        subject: `🎫 Nouveau ticket: ${ticket.subject}`,
+        subject: `🎫 New ticket: ${ticket.subject}`,
         html: generateAdminTicketNotification(ticket),
       });
     }
@@ -100,7 +92,7 @@ serve(async (req: Request): Promise<Response> => {
           
           await sendEmail({
             to: ticket.user_email,
-            subject: `Réponse à votre ticket: ${ticket.subject}`,
+            subject: `Reply to your ticket: ${ticket.subject}`,
             html: generateTicketReplyEmail(
               profile?.full_name || ticket.user_email.split("@")[0],
               ticket.subject,
@@ -161,52 +153,34 @@ function generateWelcomeEmail(name: string): string {
     </head>
     <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
       <div style="text-align: center; margin-bottom: 30px;">
-        <h1 style="color: #2e3a8c; margin: 0;">Bienvenue sur AutoPilot Geo! 🎉</h1>
+        <h1 style="color: #7c3aed; margin: 0;">Welcome to AutoPilot Geo! 🎉</h1>
       </div>
-      
-      <p>Bonjour ${name},</p>
-      
-      <p>Merci de nous avoir rejoint! Nous sommes ravis de vous compter parmi nous.</p>
-      
-      <p>Avec AutoPilot Geo, vous pouvez:</p>
+
+      <p>Hi ${name},</p>
+
+      <p>Thanks for joining! We're thrilled to have you on board.</p>
+
+      <p>With AutoPilot Geo, you can:</p>
       <ul>
-        <li>🚀 Générer des réponses AEO optimisées pour les moteurs de recherche</li>
-        <li>📝 Créer des articles de blog automatiquement</li>
-        <li>📊 Suivre vos performances avec Google Search Console</li>
-        <li>🔗 Publier directement sur WordPress, Shopify, Wix et plus</li>
+        <li>🚀 Generate AEO answers optimized for AI search engines</li>
+        <li>📝 Create blog articles automatically</li>
+        <li>📊 Track performance with Google Search Console</li>
+        <li>🔗 Publish directly to WordPress, Shopify, Wix and more</li>
       </ul>
-      
+
       <div style="text-align: center; margin: 30px 0;">
-        <a href="https://app.autopilotgeo.com/dashboard" style="background: linear-gradient(135deg, #2e3a8c, #5f6ce0); color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: 600;">Accéder à mon dashboard</a>
+        <a href="https://app.autopilotgeo.com/dashboard" style="background: linear-gradient(135deg, #7c3aed, #a855f7); color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: 600;">Go to my dashboard</a>
       </div>
-      
-      <p>Si vous avez des questions, n'hésitez pas à nous contacter via le support.</p>
-      
-      <p>À bientôt,<br><strong>L'équipe AutoPilot Geo</strong></p>
-      
+
+      <p>If you have any questions, feel free to reach out to support.</p>
+
+      <p>Talk soon,<br><strong>The AutoPilot Geo Team</strong></p>
+
       <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
       <p style="font-size: 12px; color: #888; text-align: center;">
-        AutoPilot Geo - Optimisez votre contenu pour l'ère de l'IA<br>
-        <a href="https://autopilotgeo.com" style="color: #2e3a8c;">autopilotgeo.com</a>
+        AutoPilot Geo — Optimize your content for the AI era<br>
+        <a href="https://autopilotgeo.com" style="color: #7c3aed;">autopilotgeo.com</a>
       </p>
-    </body>
-    </html>
-  `;
-}
-
-function generateNewUserNotification(profile: Record<string, any>): string {
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head><meta charset="utf-8"></head>
-    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <h2 style="color: #2e3a8c;">🆕 Nouvel utilisateur inscrit</h2>
-
-      <div style="background: #f4f4f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
-        <p style="margin: 0;"><strong>Nom:</strong> ${profile.full_name || "N/A"}</p>
-        <p style="margin: 10px 0 0;"><strong>Email:</strong> ${profile.email}</p>
-        <p style="margin: 10px 0 0;"><strong>ID:</strong> ${profile.id}</p>
-      </div>
     </body>
     </html>
   `;
@@ -218,21 +192,21 @@ function generateAdminTicketNotification(ticket: Record<string, any>): string {
     <html>
     <head><meta charset="utf-8"></head>
     <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <h2 style="color: #2e3a8c;">🎫 Nouveau Ticket de Support</h2>
-      
+      <h2 style="color: #7c3aed;">🎫 New Support Ticket</h2>
+
       <div style="background: #fef3c7; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b; margin: 20px 0;">
-        <p style="margin: 0;"><strong>De:</strong> ${ticket.user_email}</p>
-        <p style="margin: 10px 0 0;"><strong>Sujet:</strong> ${ticket.subject}</p>
+        <p style="margin: 0;"><strong>From:</strong> ${ticket.user_email}</p>
+        <p style="margin: 10px 0 0;"><strong>Subject:</strong> ${ticket.subject}</p>
       </div>
-      
+
       <div style="background: #f4f4f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
         <p style="margin: 0; white-space: pre-wrap;">${ticket.message}</p>
       </div>
-      
+
       <div style="text-align: center; margin: 30px 0;">
-        <a href="https://app.autopilotgeo.com/super-admin" style="background: linear-gradient(135deg, #2e3a8c, #5f6ce0); color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: 600;">Répondre au ticket</a>
+        <a href="https://app.autopilotgeo.com/super-admin" style="background: linear-gradient(135deg, #7c3aed, #a855f7); color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: 600;">Reply to ticket</a>
       </div>
-      
+
       <p style="font-size: 12px; color: #888;">Ticket ID: ${ticket.id}</p>
     </body>
     </html>
@@ -245,25 +219,25 @@ function generateTicketReplyEmail(name: string, subject: string, message: string
     <html>
     <head><meta charset="utf-8"></head>
     <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <h2 style="color: #2e3a8c;">Nouvelle réponse à votre ticket 💬</h2>
-      
-      <p>Bonjour ${name},</p>
-      
-      <p>Notre équipe support a répondu à votre demande "<strong>${subject}</strong>":</p>
-      
+      <h2 style="color: #7c3aed;">New reply to your ticket 💬</h2>
+
+      <p>Hi ${name},</p>
+
+      <p>Our support team has replied to your request "<strong>${subject}</strong>":</p>
+
       <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; border-left: 4px solid #22c55e; margin: 20px 0;">
         <p style="margin: 0; white-space: pre-wrap;">${message}</p>
       </div>
-      
+
       <div style="text-align: center; margin: 30px 0;">
-        <a href="https://autopilotgeo.com/support" style="background: linear-gradient(135deg, #2e3a8c, #5f6ce0); color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: 600;">Voir la conversation</a>
+        <a href="https://autopilotgeo.com/support" style="background: linear-gradient(135deg, #7c3aed, #a855f7); color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: 600;">View conversation</a>
       </div>
-      
-      <p>Cordialement,<br><strong>L'équipe Support AutoPilot Geo</strong></p>
-      
+
+      <p>Best regards,<br><strong>The AutoPilot Geo Support Team</strong></p>
+
       <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
       <p style="font-size: 12px; color: #888; text-align: center;">
-        Répondez directement à ce mail pour continuer la conversation.
+        Reply directly to this email to continue the conversation.
       </p>
     </body>
     </html>

@@ -87,8 +87,26 @@ Deno.serve(async (req) => {
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-|-$/g, "");
 
-      // If CMS integration exists, publish via cms-publish
-      if (integration) {
+      // Publish: use Shopify Admin API directly if shopify integration, else generic cms-publish
+      let publishedUrl: string | null = null;
+      if (integration?.platform === "shopify") {
+        try {
+          const { data: shopRes, error: shopErr } = await supabase.functions.invoke("shopify-publish-article", {
+            body: {
+              projectId: entry.project_id,
+              title: product.ai_title || product.title,
+              bodyHtml: htmlContent,
+              handle: slug,
+              metaDescription: product.ai_description?.substring(0, 160),
+              tags: ["AutoPilotGEO", product.category].filter(Boolean).join(","),
+            },
+          });
+          if (shopErr) console.error("Shopify publish error:", shopErr);
+          if (shopRes?.url) publishedUrl = shopRes.url;
+        } catch (e) {
+          console.error("Shopify publish failed:", e);
+        }
+      } else if (integration) {
         try {
           const { error: cmsError } = await supabase.functions.invoke("cms-publish", {
             body: {
@@ -108,10 +126,10 @@ Deno.serve(async (req) => {
       // Update product status
       await supabase
         .from("shopping_products")
-        .update({ 
-          status: "published", 
+        .update({
+          status: "published",
           published_at: new Date().toISOString(),
-          published_url: `/${slug}`,
+          published_url: publishedUrl || `/${slug}`,
         })
         .eq("id", product.id);
 

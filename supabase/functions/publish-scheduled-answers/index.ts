@@ -27,6 +27,7 @@ interface Article {
   html_content: string | null;
   scheduled_date: string;
   linked_answer_id: string | null;
+  slug?: string | null;
 }
 
 interface LocalAnswer {
@@ -97,6 +98,12 @@ function shouldPublishToday(frequency: string | null): boolean {
     case "monthly":
       // Publish only on the 1st of the month
       return dayOfMonth === 1;
+    case "2x_week":
+      // Publish on Tuesdays (2) and Thursdays (4)
+      return dayOfWeek === 2 || dayOfWeek === 4;
+    case "3x_week":
+      // Publish on Mondays (1), Wednesdays (3), Fridays (5) — Google HCU recommended
+      return dayOfWeek === 1 || dayOfWeek === 3 || dayOfWeek === 5;
     case "daily":
     default:
       // Daily publishing
@@ -104,10 +111,58 @@ function shouldPublishToday(frequency: string | null): boolean {
   }
 }
 
+// Strip HTML to get a clean plain-text excerpt
+function plainExcerpt(html: string, max = 160): string {
+  const text = (html || "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, " ")
+    .trim();
+  if (text.length <= max) return text;
+  return text.slice(0, max - 1).trimEnd() + "…";
+}
+
+function normalizeEditorialHtml(input: string): string {
+  let html = (input || "").trim();
+  if (!html) return "";
+  html = html.replace(/<!doctype[^>]*>/gi, "");
+  html = html.replace(/<\/?(?:html|head|body)[^>]*>/gi, "");
+  html = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "");
+  html = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "");
+  html = html.replace(/<h1[^>]*>[\s\S]*?<\/h1>/gi, "");
+  html = html.replace(/<\/?(?:article|section)[^>]*>/gi, "");
+  html = html.replace(/\sstyle\s*=\s*"[^"]*"/gi, "");
+  html = html.replace(/\sstyle\s*=\s*'[^']*'/gi, "");
+  html = html.replace(/(^|\n)\s*#{2}\s+(.+)$/gm, "$1<h2>$2</h2>");
+  html = html.replace(/(^|\n)\s*#{3}\s+(.+)$/gm, "$1<h3>$2</h3>");
+  html = html.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
+  html = html.replace(/(^|\n)\s*(Opening Summary|Comparison Criteria|Tool Solutions for Enterprise Content Strategy|Brand|ChatGPT \(OpenAI\)|Gemini \(Google\)|Perplexity AI|Comparison Table|How to Choose the Right AI for Your Enterprise|FAQ)\s*$/gmi, "$1<h2>$2</h2>");
+  html = html.split(/\n{2,}/).map((chunk) => {
+    const text = chunk.trim();
+    if (!text) return "";
+    if (/^<(h[1-6]|p|ul|ol|li|blockquote|table|thead|tbody|tr|div|details|summary)/i.test(text)) return text;
+    return `<p>${text.replace(/\n+/g, "<br>")}</p>`;
+  }).filter(Boolean).join("\n\n");
+  return html.replace(/\n{3,}/g, "\n\n").trim();
+}
+
+// HTML escape for safe interpolation in attributes/text
+function esc(s: string): string {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 function generateAnswerHTML(
   answer: Answer,
   project: Project
-): { title: string; body: string } {
+): { title: string; body: string; excerpt: string } {
   const { question, answer: answerText, supporting_content } = answer;
   const brandName = project.brand_name || project.name;
   const websiteUrl = project.website_url;
@@ -119,8 +174,6 @@ function generateAnswerHTML(
     question: item.question || item.q || "",
     answer: item.answer || item.a || ""
   })).filter(item => item.question && item.answer);
-
-  const currentYear = new Date().getFullYear();
 
   const qaJsonLd = {
     "@context": "https://schema.org",
@@ -135,11 +188,7 @@ function generateAnswerHTML(
         "@type": "Answer",
         "text": answerText,
         "dateCreated": new Date().toISOString(),
-        "author": {
-          "@type": "Organization",
-          "name": brandName,
-          "url": websiteUrl
-        }
+        "author": { "@type": "Organization", "name": brandName, "url": websiteUrl }
       }
     }
   };
@@ -150,150 +199,111 @@ function generateAnswerHTML(
     "mainEntity": faq.map(item => ({
       "@type": "Question",
       "name": item.question,
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": item.answer
-      }
+      "acceptedAnswer": { "@type": "Answer", "text": item.answer }
     }))
   } : null;
 
-  const bulletsList = bullets.length > 0 
-    ? `<section class="aeo-key-points" style="margin: 24px 0; padding: 20px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 12px;">
-        <h2 style="font-size: 18px; margin-bottom: 16px; color: #1a1a1a; font-weight: 600;">${language === 'fr' ? '🎯 Points Clés' : '🎯 Key Points'}</h2>
-        <ul style="padding-left: 20px; margin: 0;">
-          ${bullets.map(b => `<li style="margin-bottom: 10px; line-height: 1.6;">${b}</li>`).join('')}
-        </ul>
-       </section>` 
-    : '';
+  const keyPointsTitle = language === "fr" ? "Points clés" : "Key takeaways";
+  const faqTitle = language === "fr" ? "Questions fréquentes" : "Frequently asked questions";
+  const inDepthTitle = language === "fr" ? "Analyse détaillée" : "In-depth analysis";
+  const conclusionTitle = language === "fr" ? "À retenir" : "Bottom line";
 
-  const faqSection = faq.length > 0 
-    ? `<section class="aeo-faq" style="margin: 24px 0;">
-        <h2 style="font-size: 18px; margin-bottom: 16px; color: #1a1a1a; font-weight: 600;">${language === 'fr' ? '❓ Questions Fréquentes' : '❓ FAQ'}</h2>
-        ${faq.map(item => `
-          <details style="margin-bottom: 12px; border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; background: #fff;">
-            <summary style="cursor: pointer; font-weight: 500; color: #333;">${item.question}</summary>
-            <p style="margin-top: 12px; color: #555; line-height: 1.6;">${item.answer}</p>
-          </details>
-        `).join('')}
-       </section>` 
-    : '';
+  // Split answer into intro (1st sentence) + rest for magazine layout
+  const sentences = answerText.match(/[^.!?]+[.!?]+/g) || [answerText];
+  const leadSentence = (sentences[0] || answerText).trim();
+  const restOfAnswer = sentences.slice(1).join(" ").trim();
 
-  const body = `
-<article class="aeo-article" style="max-width: 800px; margin: 0 auto; padding: 32px; font-family: system-ui, -apple-system, sans-serif; line-height: 1.7; color: #1a1a1a;">
-  <script type="application/ld+json">${JSON.stringify(qaJsonLd)}</script>
-  ${faqJsonLd ? `<script type="application/ld+json">${JSON.stringify(faqJsonLd)}</script>` : ''}
-  
-  <h1 style="font-size: 28px; margin-bottom: 24px; color: #0a0a0a; font-weight: 700; line-height: 1.3;">${question}</h1>
-  
-  <div class="aeo-answer-box" style="background: linear-gradient(135deg, #5f6ce015 0%, #1a205815 100%); border-left: 4px solid #5f6ce0; padding: 24px; margin-bottom: 24px; border-radius: 0 12px 12px 0;">
-    <p style="margin: 0; font-size: 17px; line-height: 1.7; color: #2d2d2d;">${answerText}</p>
-  </div>
-  
-  ${bulletsList}
-  ${faqSection}
-  
-  <footer class="aeo-footer" style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #e5e5e5; font-size: 14px; color: #666;">
-    <p style="margin: 0 0 8px 0;"><a href="https://autopilotgeo.com" style="color: #5f6ce0; text-decoration: none; font-weight: 500;" target="_blank">AutoPilot Geo</a> – Rank in ChatGPT Gemini & Google with AI Answers</p>
-    <p style="margin: 0; font-size: 12px; color: #999;">AutoPilot Geo – Rank in ChatGPT</p>
-  </footer>
-</article>`;
+  // aeo-answer pull paragraph (citable)
+  const aeoAnswerBlock = `<p class="aeo-answer"><strong>${esc(leadSentence)}</strong>${restOfAnswer ? " " + esc(restOfAnswer) : ""}</p>`;
 
-  return { title: question, body };
+  // aeo-summary takeaways box
+  const summaryBlock = bullets.length > 0
+    ? `<div class="aeo-summary">\n<p><strong>${keyPointsTitle}:</strong></p>\n<ul>\n${bullets.map(b => `  <li>${esc(b)}</li>`).join("\n")}\n</ul>\n</div>`
+    : "";
+
+  // Editorial H2 sections — promote each bullet to a section heading with a short paragraph
+  const sectionsBlock = bullets.length > 0
+    ? `<h2>${inDepthTitle}</h2>\n` + bullets.map((b, i) => {
+        const text = String(b || "").trim();
+        // Use bullet sentence as H3 lead, then expand with the bullet as paragraph
+        const heading = text.replace(/^[-•*]\s*/, "").split(/[.:]/)[0].slice(0, 80) || `${language === "fr" ? "Point" : "Point"} ${i + 1}`;
+        return `<h3>${esc(heading)}</h3>\n<p>${esc(text)}</p>`;
+      }).join("\n\n")
+    : "";
+
+  // FAQ accordion using <details> (rendered as expandable by ArticleTemplate/.editorial-prose)
+  const faqBlock = faq.length > 0
+    ? `<h2>${faqTitle}</h2>\n${faq.map(item => `<details class="faq-item"><summary>${esc(item.question)}</summary><p>${esc(item.answer)}</p></details>`).join("\n")}`
+    : "";
+
+  // Conclusion pull-quote
+  const conclusionBlock = `<h2>${conclusionTitle}</h2>\n<blockquote>${esc(leadSentence)}</blockquote>`;
+
+  // Magazine layout: aeo-answer → aeo-summary → in-depth sections → FAQ → conclusion
+  const body = [
+    `<script type="application/ld+json">${JSON.stringify(qaJsonLd)}</script>`,
+    faqJsonLd ? `<script type="application/ld+json">${JSON.stringify(faqJsonLd)}</script>` : "",
+    aeoAnswerBlock,
+    summaryBlock,
+    sectionsBlock,
+    faqBlock,
+    conclusionBlock,
+  ].filter(Boolean).join("\n\n");
+
+  return { title: question, body, excerpt: plainExcerpt(answerText) };
 }
 
 function generateArticleHTML(
   article: Article,
-  project: Project
-): { title: string; body: string } {
-  const brandName = project.brand_name || project.name;
-  const websiteUrl = project.website_url;
-  const language = project.language || "fr";
-  const currentYear = new Date().getFullYear();
-
-  // Use existing HTML content if available
-  if (article.html_content) {
-    return {
-      title: article.title,
-      body: `
-<article class="aeo-blog-article" style="max-width: 800px; margin: 0 auto; padding: 32px; font-family: system-ui, -apple-system, sans-serif; line-height: 1.7;">
-  <h1 style="font-size: 32px; margin-bottom: 24px; font-weight: 700;">${article.title}</h1>
-  ${article.html_content}
-  <footer style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #e5e5e5; font-size: 14px; color: #666;">
-    <p style="margin: 0 0 8px 0;"><a href="https://autopilotgeo.com" style="color: #5f6ce0;" target="_blank">AutoPilot Geo</a> – Rank in ChatGPT Gemini & Google with AI Answers</p>
-    <p style="margin: 0; font-size: 12px; color: #999;">AutoPilot Geo – Rank in ChatGPT</p>
-  </footer>
-</article>`
-    };
+  _project: Project
+): { title: string; body: string; excerpt: string } {
+  // Use existing HTML content when available; otherwise convert markdown-ish to HTML
+  let html = article.html_content?.trim() || "";
+  if (!html) {
+    const content = article.content || "";
+    html = content
+      .replace(/^### (.*)$/gm, "<h3>$1</h3>")
+      .replace(/^## (.*)$/gm, "<h2>$1</h2>")
+      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+      .split(/\n{2,}/)
+      .map(p => p.startsWith("<") ? p : `<p>${p.trim()}</p>`)
+      .join("\n");
   }
-
-  // Fallback to content
-  const content = article.content || "";
-  const htmlContent = content
-    .replace(/### (.*)/g, '<h3>$1</h3>')
-    .replace(/## (.*)/g, '<h2>$1</h2>')
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\n\n/g, '</p><p>');
-
-  return {
-    title: article.title,
-    body: `
-<article class="aeo-blog-article" style="max-width: 800px; margin: 0 auto; padding: 32px; font-family: system-ui, -apple-system, sans-serif; line-height: 1.7;">
-  <h1 style="font-size: 32px; margin-bottom: 24px; font-weight: 700;">${article.title}</h1>
-  <div class="article-content"><p>${htmlContent}</p></div>
-  <footer style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #e5e5e5; font-size: 14px; color: #666;">
-    <p>Source: <a href="${websiteUrl}" style="color: #5f6ce0;">${brandName}</a> • ${currentYear}</p>
-  </footer>
-</article>`
-  };
+  // Normalize generated/markdown-ish content into the editorial magazine body.
+  html = normalizeEditorialHtml(html);
+  return { title: article.title, body: html, excerpt: plainExcerpt(html) };
 }
 
 function generateLocalAnswerHTML(
   localAnswer: LocalAnswer,
   project: Project
-): { title: string; body: string } {
+): { title: string; body: string; excerpt: string } {
   const { question, answer, business_name } = localAnswer;
-  const brandName = project.brand_name || project.name;
-  const websiteUrl = project.website_url;
-  const language = project.language || "fr";
-
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "LocalBusiness",
     "name": business_name,
-    "url": websiteUrl,
+    "url": project.website_url,
     "mainEntity": {
       "@type": "Question",
       "name": question,
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": answer
-      }
+      "acceptedAnswer": { "@type": "Answer", "text": answer }
     }
   };
-
-  const body = `
-<article class="local-aeo-article" style="max-width: 800px; margin: 0 auto; padding: 32px; font-family: system-ui, -apple-system, sans-serif; line-height: 1.7;">
-  <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
-  
-  <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 24px;">
-    <span style="background: linear-gradient(135deg, #f97316, #ef4444); color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">Local AEO</span>
-    <span style="color: #666; font-size: 14px;">${business_name}</span>
-  </div>
-  
-  <h1 style="font-size: 28px; margin-bottom: 24px; color: #0a0a0a; font-weight: 700; line-height: 1.3;">${question}</h1>
-  
-  <div class="local-answer-box" style="background: linear-gradient(135deg, #f9731615 0%, #ef444415 100%); border-left: 4px solid #f97316; padding: 24px; margin-bottom: 24px; border-radius: 0 12px 12px 0;">
-    <p style="margin: 0; font-size: 17px; line-height: 1.7; color: #2d2d2d;">${answer}</p>
-  </div>
-  
-  <footer class="aeo-footer" style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #e5e5e5; font-size: 14px; color: #666;">
-    <p style="margin: 0 0 8px 0;"><a href="https://autopilotgeo.com" style="color: #f97316; text-decoration: none; font-weight: 500;" target="_blank">AutoPilot Geo</a> – Local AEO for AI Search</p>
-    <p style="margin: 0; font-size: 12px; color: #999;">AutoPilot Geo – Rank in ChatGPT</p>
-  </footer>
-</article>`;
-
-  return { title: question, body };
+  const body = [
+    `<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>`,
+    `<p><strong>${esc(business_name)}</strong></p>`,
+    `<blockquote>${esc(answer)}</blockquote>`,
+  ].join("\n\n");
+  return { title: question, body, excerpt: plainExcerpt(answer) };
 }
+
+function buildPublicBlogUrl(baseUrl: string | null | undefined, slug: string | null | undefined) {
+  if (!baseUrl || !slug) return null;
+  return `${baseUrl.replace(/\/+$/, "")}/blog/${slug}`;
+}
+
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -432,32 +442,44 @@ Deno.serve(async (req) => {
 
     const projectIds = projectsToPublish.map(ps => ps.project_id);
 
-    // IMPORTANT: Use planning_days as the canonical schedule source (fixed calendar)
-    // This prevents future items being published early because of drift in answers/articles.scheduled_date.
-    let planningQuery = supabase
-      .from("planning_days")
-      .select("project_id, scheduled_date, answer_id, article_id")
-      .in("project_id", projectIds);
+    // IMPORTANT: Read schedule from BOTH `planning_days` (legacy) and `planning`
+    // (used by daily-planning-fill). They share the same shape (project_id +
+    // date + answer_id + article_id), only the date column name differs.
+    const [
+      { data: planningDaysRows, error: planningDaysError },
+      { data: planningRows2, error: planningError2 },
+    ] = await Promise.all([
+      supabase
+        .from("planning_days")
+        .select("project_id, scheduled_date, answer_id, article_id")
+        .in("project_id", projectIds)
+        .eq("scheduled_date", todayStr),
+      supabase
+        .from("planning")
+        .select("project_id, day, answer_id, article_id")
+        .in("project_id", projectIds)
+        .eq("day", todayStr),
+    ]);
 
-    if (targetDate) {
-      // Exact day publishing (retroactive)
-      planningQuery = planningQuery.eq("scheduled_date", todayStr);
-    } else if (forceToday) {
-      // Manual trigger from UI: publish ONLY today
-      planningQuery = planningQuery.eq("scheduled_date", todayStr);
-    } else {
-      // Normal cron: publish ONLY today's content (no catch-up of old items)
-      planningQuery = planningQuery.eq("scheduled_date", todayStr);
+    if (planningDaysError) {
+      console.error("[publish-scheduled] ❌ Error fetching planning_days:", planningDaysError);
+    }
+    if (planningError2) {
+      console.error("[publish-scheduled] ❌ Error fetching planning:", planningError2);
     }
 
-    const { data: planningRows, error: planningError } = await planningQuery;
+    const planningRows = [
+      ...(planningDaysRows || []),
+      ...(planningRows2 || []).map((r: any) => ({
+        project_id: r.project_id,
+        scheduled_date: r.day,
+        answer_id: r.answer_id,
+        article_id: r.article_id,
+      })),
+    ];
 
-    if (planningError) {
-      console.error("[publish-scheduled] ❌ Error fetching planning_days:", planningError);
-    }
-
-    const answerIds = [...new Set((planningRows || []).map((r: any) => r.answer_id).filter(Boolean))];
-    const articleIds = [...new Set((planningRows || []).map((r: any) => r.article_id).filter(Boolean))];
+    const answerIds = [...new Set(planningRows.map((r: any) => r.answer_id).filter(Boolean))];
+    const articleIds = [...new Set(planningRows.map((r: any) => r.article_id).filter(Boolean))];
 
     // Fetch answers/articles by IDs only (no scheduled_date filtering here)
     // Also fetch local_answers directly by scheduled_date (they don't use planning_days)
@@ -541,7 +563,7 @@ Deno.serve(async (req) => {
         }
 
         const integration = integrations[0] as Integration;
-        const { title, body } = generateAnswerHTML(answer, project);
+        const { title, body, excerpt } = generateAnswerHTML(answer, project);
 
         // Call cms-publish
         const publishResponse = await fetch(`${supabaseUrl}/functions/v1/cms-publish`, {
@@ -552,7 +574,7 @@ Deno.serve(async (req) => {
           },
           body: JSON.stringify({
             integrationId: integration.id,
-            content: { title, body, type: "answer", sourceId: answer.id }
+            content: { title, body, excerpt, type: "answer", sourceId: answer.id }
           })
         });
 
@@ -563,13 +585,13 @@ Deno.serve(async (req) => {
             .from("answers")
             .update({
               is_public: true,
-              published_url: publishResult.url || null,
+              published_url: publishResult.publishedUrl || null,
               published_at: new Date().toISOString()
             })
             .eq("id", answer.id);
 
-          console.log(`[publish-scheduled] ✅ Answer published: ${publishResult.url || answer.id}`);
-          results.push({ id: answer.id, type: "answer", success: true, url: publishResult.url });
+          console.log(`[publish-scheduled] ✅ Answer published: ${publishResult.publishedUrl || answer.id}`);
+          results.push({ id: answer.id, type: "answer", success: true, url: publishResult.publishedUrl });
         } else {
           console.error(`[publish-scheduled] ❌ Failed to publish answer: ${publishResult.error}`);
           results.push({ id: answer.id, type: "answer", success: false, error: publishResult.error });
@@ -607,18 +629,25 @@ Deno.serve(async (req) => {
 
         if (!integrations || integrations.length === 0) {
           // Just mark as published without CMS
+          const fallbackUrl = buildPublicBlogUrl(project.website_url, article.slug);
           await supabase
             .from("articles")
             .update({ status: "published" })
             .eq("id", article.id);
+          if (article.linked_answer_id) {
+            await supabase
+              .from("answers")
+              .update({ is_public: true, published_url: fallbackUrl, published_at: new Date().toISOString() })
+              .eq("id", article.linked_answer_id);
+          }
           
-          console.log(`[publish-scheduled] ✅ Article marked as published (no CMS): ${article.id}`);
-          results.push({ id: article.id, type: "article", success: true, url: "internal" });
+          console.log(`[publish-scheduled] ✅ Article marked as published (no CMS): ${fallbackUrl || article.id}`);
+          results.push({ id: article.id, type: "article", success: true, url: fallbackUrl || "internal" });
           continue;
         }
 
         const integration = integrations[0] as Integration;
-        const { title, body } = generateArticleHTML(article, project);
+        const { title, body, excerpt } = generateArticleHTML(article, project);
 
         // Call cms-publish with slug included
         const articleSlug = (article as any).slug || article.title
@@ -630,7 +659,7 @@ Deno.serve(async (req) => {
           .replace(/-+/g, "-")
           .replace(/^-|-$/g, "")
           .substring(0, 80);
-          
+
         const publishResponse = await fetch(`${supabaseUrl}/functions/v1/cms-publish`, {
           method: "POST",
           headers: {
@@ -639,20 +668,31 @@ Deno.serve(async (req) => {
           },
           body: JSON.stringify({
             integrationId: integration.id,
-            content: { title, body, type: "article", sourceId: article.id, slug: articleSlug }
+            content: { title, body, excerpt, type: "article", sourceId: article.id, slug: articleSlug }
           })
         });
 
         const publishResult = await publishResponse.json();
 
         if (publishResult.success) {
+          const publishedUrl = publishResult.publishedUrl || buildPublicBlogUrl(project.website_url, articleSlug);
           await supabase
             .from("articles")
             .update({ status: "published" })
             .eq("id", article.id);
+          if (article.linked_answer_id) {
+            await supabase
+              .from("answers")
+              .update({
+                is_public: true,
+                published_url: publishedUrl || null,
+                published_at: new Date().toISOString()
+              })
+              .eq("id", article.linked_answer_id);
+          }
 
-          console.log(`[publish-scheduled] ✅ Article published: ${publishResult.url || article.id}`);
-          results.push({ id: article.id, type: "article", success: true, url: publishResult.url });
+          console.log(`[publish-scheduled] ✅ Article published: ${publishedUrl || article.id}`);
+          results.push({ id: article.id, type: "article", success: true, url: publishedUrl || undefined });
         } else {
           console.error(`[publish-scheduled] ❌ Failed to publish article: ${publishResult.error}`);
           results.push({ id: article.id, type: "article", success: false, error: publishResult.error });
@@ -701,7 +741,7 @@ Deno.serve(async (req) => {
         }
 
         const integration = integrations[0] as Integration;
-        const { title, body } = generateLocalAnswerHTML(localAnswer as LocalAnswer, project);
+        const { title, body, excerpt } = generateLocalAnswerHTML(localAnswer as LocalAnswer, project);
 
         // Call cms-publish
         const publishResponse = await fetch(`${supabaseUrl}/functions/v1/cms-publish`, {
@@ -712,7 +752,7 @@ Deno.serve(async (req) => {
           },
           body: JSON.stringify({
             integrationId: integration.id,
-            content: { title, body, type: "local-answer", sourceId: localAnswer.id }
+            content: { title, body, excerpt, type: "local-answer", sourceId: localAnswer.id }
           })
         });
 
@@ -723,13 +763,13 @@ Deno.serve(async (req) => {
             .from("local_answers")
             .update({
               is_public: true,
-              published_url: publishResult.url || null,
+              published_url: publishResult.publishedUrl || null,
               published_at: new Date().toISOString()
             })
             .eq("id", localAnswer.id);
 
-          console.log(`[publish-scheduled] ✅ Local answer published: ${publishResult.url || localAnswer.id}`);
-          results.push({ id: localAnswer.id, type: "local-answer", success: true, url: publishResult.url });
+          console.log(`[publish-scheduled] ✅ Local answer published: ${publishResult.publishedUrl || localAnswer.id}`);
+          results.push({ id: localAnswer.id, type: "local-answer", success: true, url: publishResult.publishedUrl });
         } else {
           console.error(`[publish-scheduled] ❌ Failed to publish local answer: ${publishResult.error}`);
           results.push({ id: localAnswer.id, type: "local-answer", success: false, error: publishResult.error });

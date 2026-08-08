@@ -138,42 +138,72 @@ async function testWordPress(config: Record<string, string>): Promise<{ success:
 
     const basicAuth = btoa(`${username}:${password}`);
 
-    // Test with /wp-json/wp/v2/users/me - requires authentication
-    const response = await fetch(`${siteUrl}/wp-json/wp/v2/users/me`, {
-      headers: {
-        Authorization: `Basic ${basicAuth}`,
-        "Content-Type": "application/json",
-      },
-    });
+    // Try pretty permalinks first, then fall back to plain (?rest_route=)
+    const tryEndpoints = [
+      `${siteUrl}/wp-json/wp/v2/users/me`,
+      `${siteUrl}/?rest_route=/wp/v2/users/me`,
+    ];
 
-    if (response.ok) {
+    let response: Response | null = null;
+    for (const url of tryEndpoints) {
+      response = await fetch(url, {
+        headers: {
+          Authorization: `Basic ${basicAuth}`,
+          "Content-Type": "application/json",
+        },
+      });
+      if (response.status !== 404) break;
+    }
+
+    if (response && response.ok) {
       const user = await response.json();
-      return { 
-        success: true, 
-        message: `Connected as "${user.name || user.slug}"! Ready to publish.` 
+      return {
+        success: true,
+        message: `Connected as "${user.name || user.slug}"! Ready to publish.`,
       };
     }
 
-    if (response.status === 401) {
-      return { 
-        success: false, 
-        message: "Invalid credentials. Check your username and Application Password in Users → Profile → Application Passwords." 
+    if (response && response.status === 401) {
+      return {
+        success: false,
+        message: "Invalid credentials. Check your username and Application Password in Users → Profile → Application Passwords.",
       };
     }
 
-    if (response.status === 404) {
-      // Try to check if REST API is available
-      const apiCheck = await fetch(`${siteUrl}/wp-json/`);
-      if (!apiCheck.ok) {
-        return { success: false, message: "WordPress REST API not found. Ensure permalinks are enabled." };
+    if (response && response.status === 404) {
+      // Check both REST API discovery endpoints
+      const discovery = await fetch(`${siteUrl}/wp-json/`);
+      const discoveryPlain = await fetch(`${siteUrl}/?rest_route=/`);
+      if (!discovery.ok && !discoveryPlain.ok) {
+        return {
+          success: false,
+          message: `No WordPress REST API found at ${siteUrl}. Make sure this URL points to a real WordPress install.`,
+        };
       }
-      return { success: false, message: "Authentication endpoint not found. Check your WordPress version." };
+      return { success: false, message: "Authentication endpoint not found. Check your WordPress version (REST API requires 4.7+)." };
     }
+
+
 
     const errorText = await response.text().catch(() => response.statusText);
     return { success: false, message: `WordPress error (${response.status}): ${errorText.slice(0, 100)}` };
   } catch (error) {
-    return { success: false, message: `Connection failed: ${error instanceof Error ? error.message : "Network error"}` };
+    const msg = error instanceof Error ? error.message : "Network error";
+    // Detect common SSL / DNS / network issues and give a clearer hint
+    if (/invalid peer certificate|UnknownIssuer|certificate|self.signed|SSL|TLS/i.test(msg)) {
+      return {
+        success: false,
+        message:
+          "SSL certificate issue on your WordPress site. The certificate chain is incomplete or issued by an unknown authority. Install a trusted certificate (e.g. Let's Encrypt) and make sure the full chain (including intermediate certs) is served. Test it at https://www.ssllabs.com/ssltest/ — then retry.",
+      };
+    }
+    if (/ENOTFOUND|dns|getaddrinfo/i.test(msg)) {
+      return { success: false, message: "Domain not found. Double-check your Site URL." };
+    }
+    if (/ECONNREFUSED|refused|timeout|timed out/i.test(msg)) {
+      return { success: false, message: "Could not reach your WordPress site (connection refused or timeout). Make sure it's online and publicly accessible." };
+    }
+    return { success: false, message: `Connection failed: ${msg}` };
   }
 }
 

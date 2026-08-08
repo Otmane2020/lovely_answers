@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { reviewWithClaude } from "../_shared/claude-review.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -353,10 +354,7 @@ Return ONLY valid JSON:
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "google/gemma-4-31b-it:free",
-      // Free models get rate-limited upstream constantly; OpenRouter falls back
-      // through this list automatically when one errors out.
-      models: ["google/gemma-4-31b-it:free", "google/gemma-4-26b-a4b-it:free", "nvidia/nemotron-3-super-120b-a12b:free"],
+      model: "google/gemini-2.5-flash",
       temperature: 0.45,
       max_tokens: 2000, // ← CRITIQUE : assez pour 300-450 mots en markdown
       messages: [
@@ -372,12 +370,12 @@ Return ONLY valid JSON:
 
   const parsed = safeParseJSON<{ answer: string; bullets: string[] }>(raw);
 
-  // Fallback si trop court
+  // NO FALLBACK - reject too-short AI output instead of padding it
   const words = countWords(parsed.answer || "");
   if (words < 80) {
-    console.warn(`[generate-30-local] Short answer (${words} words) for: "${question}"`);
-    parsed.answer = `## ${question}\n\n${parsed.answer}\n\n*Pour plus d'informations, contactez directement ${businessName}.*`;
+    throw new Error(`AI returned too-short answer (${words} words) for "${question}" — refusing to publish placeholder content`);
   }
+
 
   return parsed;
 }
@@ -469,6 +467,18 @@ serve(async (req) => {
           language,
           OPENROUTER_API_KEY!,
         );
+
+        // ── Claude review (post-generation polish) ──
+        if (generated.answer) {
+          const reviewed = await reviewWithClaude({
+            content: generated.answer,
+            contentType: "local_answer",
+            language,
+            brand: businessName,
+            question,
+          });
+          generated.answer = reviewed.content;
+        }
 
         const words = countWords(generated.answer);
         const score = computeLocalScore(generated.answer, businessName);

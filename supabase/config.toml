@@ -1,11 +1,5 @@
 project_id = "pnohfokjlhpzrkczruju"
 
-# Previously deployed with an explicit --no-verify-jwt CLI flag rather than a
-# config.toml entry; declared here so a blanket `functions deploy` preserves
-# the same auth behavior instead of defaulting to verify_jwt = true.
-[functions.welcome-automation]
-verify_jwt = false
-
 [functions.firecrawl-scrape]
 verify_jwt = false
 
@@ -51,17 +45,12 @@ verify_jwt = false
 [functions.customer-portal]
 verify_jwt = false
 
-[functions.help-chat]
-verify_jwt = false
-
 [functions.aeo-sync]
 verify_jwt = false
 
-# NOTE: config.toml has no `schedule` key — only verify_jwt, import_map and
-# entrypoint exist here. Scheduling lives in pg_cron; see
-# supabase/migrations/20260805100000_fix_cron_jobs.sql
 [functions.publish-scheduled-answers]
 verify_jwt = false
+schedule = "0 * * * *"
 
 [functions.generate-30-days-content]
 verify_jwt = false
@@ -77,9 +66,11 @@ verify_jwt = false
 
 [functions.check-planning-completeness]
 verify_jwt = false
+schedule = "0 */6 * * *"
 
 [functions.daily-planning-fill]
 verify_jwt = false
+schedule = "0 6 * * *"
 
 [functions.suggest-audiences]
 verify_jwt = false
@@ -134,6 +125,7 @@ verify_jwt = false
 
 [functions.index-published-articles]
 verify_jwt = false
+schedule = "30 * * * *"
 
 [functions.gsc-test-indexation]
 verify_jwt = false
@@ -143,6 +135,7 @@ verify_jwt = false
 
 [functions.abandoned-cart-emails]
 verify_jwt = false
+schedule = "0 * * * *"
 
 [functions.generate-strategic-articles]
 verify_jwt = false
@@ -227,6 +220,7 @@ verify_jwt = false
 
 [functions.publish-geo-content]
 verify_jwt = false
+schedule = "0 2 * * *"
 
 [functions.create-search-campaign]
 verify_jwt = false
@@ -240,11 +234,21 @@ verify_jwt = false
 [functions.prerender]
 verify_jwt = false
 
-[functions.scrape-site-pages]
+[functions.shopify-oauth-install]
 verify_jwt = false
 
-[functions.onboarding-pipeline]
+[functions.shopify-oauth-callback]
 verify_jwt = false
 
-[functions.enrich-keywords]
+[functions.shopify-import-products]
+verify_jwt = false
+
+
+[functions.shopify-fetch-context]
+verify_jwt = false
+
+[functions.shopify-publish-article]
+verify_jwt = false
+
+[functions.debug-shopping-status]
 verify_jwt = false

@@ -17,7 +17,7 @@ export default function Privacy() {
 
       <div className="min-h-screen">
         {/* Navigation */}
-        <nav className="fixed top-0 z-50 w-full border-b border-white/10 bg-[#1a2058]/90 backdrop-blur-xl">
+        <nav className="fixed top-0 z-50 w-full border-b border-white/10 bg-[hsl(222,47%,11%)]/90 backdrop-blur-xl">
           <div className="container flex h-16 items-center justify-between">
             <Link href="/" className="flex items-center">
               <AnimatedLogo size="md" />
@@ -29,7 +29,7 @@ export default function Privacy() {
         </nav>
 
         {/* Hero bar */}
-        <div className="bg-[#1a2058] pt-28 pb-12">
+        <div className="bg-[hsl(222,47%,11%)] pt-28 pb-12">
           <div className="container max-w-3xl">
             <h1 className="text-4xl font-bold text-white">Privacy Policy</h1>
             <p className="text-white/40 mt-2">Last updated: January 2026</p>
@@ -41,7 +41,7 @@ export default function Privacy() {
           <div className="container max-w-3xl">
             <div className="space-y-8 text-gray-500">
               <section className="space-y-3">
-                <h2 className="text-2xl font-semibold text-[#1a2058]">1. Information We Collect</h2>
+                <h2 className="text-2xl font-semibold text-[hsl(222,47%,11%)]">1. Information We Collect</h2>
                 <p>We collect information you provide directly to us, including:</p>
                 <ul className="list-disc pl-6 space-y-2">
                   <li>Account information (email, name, password)</li>
@@ -51,7 +51,7 @@ export default function Privacy() {
                 </ul>
               </section>
               <section className="space-y-3">
-                <h2 className="text-2xl font-semibold text-[#1a2058]">2. How We Use Your Information</h2>
+                <h2 className="text-2xl font-semibold text-[hsl(222,47%,11%)]">2. How We Use Your Information</h2>
                 <p>We use the information we collect to:</p>
                 <ul className="list-disc pl-6 space-y-2">
                   <li>Provide and improve our services</li>
@@ -62,11 +62,11 @@ export default function Privacy() {
                 </ul>
               </section>
               <section className="space-y-3">
-                <h2 className="text-2xl font-semibold text-[#1a2058]">3. Data Security</h2>
+                <h2 className="text-2xl font-semibold text-[hsl(222,47%,11%)]">3. Data Security</h2>
                 <p>We implement industry-standard security measures to protect your data. All payment processing is handled by Stripe, a PCI-compliant payment processor. Your data is encrypted in transit and at rest.</p>
               </section>
               <section className="space-y-3">
-                <h2 className="text-2xl font-semibold text-[#1a2058]">4. Data Sharing</h2>
+                <h2 className="text-2xl font-semibold text-[hsl(222,47%,11%)]">4. Data Sharing</h2>
                 <p>We do not sell your personal information. We may share data with:</p>
                 <ul className="list-disc pl-6 space-y-2">
                   <li>Service providers who help us operate our platform</li>
@@ -75,7 +75,7 @@ export default function Privacy() {
                 </ul>
               </section>
               <section className="space-y-3">
-                <h2 className="text-2xl font-semibold text-[#1a2058]">5. Your Rights</h2>
+                <h2 className="text-2xl font-semibold text-[hsl(222,47%,11%)]">5. Your Rights</h2>
                 <p>You have the right to:</p>
                 <ul className="list-disc pl-6 space-y-2">
                   <li>Access your personal data</li>
@@ -86,16 +86,16 @@ export default function Privacy() {
                 </ul>
               </section>
               <section className="space-y-3">
-                <h2 className="text-2xl font-semibold text-[#1a2058]">6. Cookies</h2>
+                <h2 className="text-2xl font-semibold text-[hsl(222,47%,11%)]">6. Cookies</h2>
                 <p>We use cookies and similar technologies to enhance your experience, analyze site usage, and assist in our marketing efforts.</p>
               </section>
               <section className="space-y-3">
-                <h2 className="text-2xl font-semibold text-[#1a2058]">7. Contact</h2>
+                <h2 className="text-2xl font-semibold text-[hsl(222,47%,11%)]">7. Contact</h2>
                 <p>For privacy inquiries, contact us at <a href="mailto:support@autopilotgeo.com" className="text-violet-600 hover:underline">support@autopilotgeo.com</a></p>
               </section>
               <section className="space-y-3">
-                <h2 className="text-2xl font-semibold text-[#1a2058]">8. Company Information</h2>
-                <p>AutoPilot Geo Ltd<br />Suite 4, Piccadilly House<br />Manchester, M1 1AB<br />United Kingdom</p>
+                <h2 className="text-2xl font-semibold text-[hsl(222,47%,11%)]">8. Company Information</h2>
+                <p>AutoPilot Geo Ltd — Contact: <a href="mailto:support@autopilotgeo.com" className="text-violet-600 hover:underline">support@autopilotgeo.com</a></p>
               </section>
             </div>
           </div>

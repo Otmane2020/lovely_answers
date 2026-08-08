@@ -445,27 +445,64 @@ export default function Dashboard() {
         <div>
           <p className="text-[10px] uppercase tracking-widest text-primary font-semibold mb-1">AI Visibility Dashboard</p>
           <h2 className="text-base sm:text-lg font-semibold text-foreground mb-4">Performance Metrics</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-            {[
-              { name: "ChatGPT", logo: chatgptIcon, score: Math.min(realStats.avgScore + 8, 100), color: "from-emerald-500 to-teal-400" },
-              { name: "Gemini", logo: geminiLogo, score: Math.min(realStats.avgScore + 2, 100), color: "from-blue-500 to-cyan-400" },
-              { name: "Perplexity", logo: perplexityLogo, score: Math.max(realStats.avgScore - 5, 0), color: "from-cyan-400 to-sky-500" },
-            ].map((platform) => (
-              <Card key={platform.name} className="p-5 border border-border/50 bg-card">
-                <div className="flex items-center gap-2 mb-3">
-                  <img src={typeof platform.logo === "string" ? platform.logo : platform.logo.src} alt={platform.name} className="w-4 h-4 object-contain" />
-                  <span className="text-xs font-medium text-muted-foreground">{platform.name}</span>
+          {(() => {
+            const platforms = [
+              { name: "ChatGPT", logo: chatgptIcon, score: Math.min(realStats.avgScore + 8, 100), color: "from-emerald-500 to-teal-400", accent: "bg-emerald-500/10" },
+              { name: "Gemini", logo: geminiLogo, score: Math.min(realStats.avgScore + 2, 100), color: "from-blue-500 to-cyan-400", accent: "bg-blue-500/10" },
+              { name: "Perplexity", logo: perplexityLogo, score: Math.max(realStats.avgScore - 5, 0), color: "from-cyan-400 to-sky-500", accent: "bg-cyan-500/10" },
+            ];
+            return (
+              <>
+                {/* Mobile bento: hero + 2 mini */}
+                <div className="grid grid-cols-2 gap-3 sm:hidden">
+                  <Card className="col-span-2 relative overflow-hidden p-5 border border-border/60 bg-gradient-to-br from-primary/5 via-card to-emerald-500/5">
+                    <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-emerald-500/10 blur-2xl" />
+                    <div className="relative">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className={`w-8 h-8 rounded-lg ${platforms[0].accent} flex items-center justify-center`}>
+                          <img src={typeof platforms[0].logo === "string" ? platforms[0].logo : platforms[0].logo.src} alt={platforms[0].name} className="w-4 h-4 object-contain" />
+                        </div>
+                        <span className="text-xs font-semibold text-foreground">{platforms[0].name}</span>
+                        <span className="ml-auto text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Top platform</span>
+                      </div>
+                      <p className="text-5xl font-bold text-foreground mb-3 tracking-tight">{platforms[0].score}%</p>
+                      <div className="w-full h-2 bg-muted/60 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full bg-gradient-to-r ${platforms[0].color} transition-all duration-700`} style={{ width: `${platforms[0].score}%` }} />
+                      </div>
+                    </div>
+                  </Card>
+                  {platforms.slice(1).map((platform) => (
+                    <Card key={platform.name} className="p-4 border border-border/50">
+                      <div className={`w-8 h-8 rounded-lg ${platform.accent} flex items-center justify-center mb-2`}>
+                        <img src={typeof platform.logo === "string" ? platform.logo : platform.logo.src} alt={platform.name} className="w-4 h-4 object-contain" />
+                      </div>
+                      <p className="text-[11px] font-medium text-muted-foreground mb-1">{platform.name}</p>
+                      <p className="text-2xl font-bold text-foreground mb-2">{platform.score}%</p>
+                      <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full bg-gradient-to-r ${platform.color}`} style={{ width: `${platform.score}%` }} />
+                      </div>
+                    </Card>
+                  ))}
                 </div>
-                <p className="text-3xl sm:text-4xl font-bold text-foreground mb-3">{platform.score}%</p>
-                <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full rounded-full bg-gradient-to-r ${platform.color} transition-all duration-700`}
-                    style={{ width: `${platform.score}%` }}
-                  />
+
+                {/* Desktop: original 3-col grid */}
+                <div className="hidden sm:grid sm:grid-cols-3 gap-4">
+                  {platforms.map((platform) => (
+                    <Card key={platform.name} className="p-5 border border-border/50 bg-card">
+                      <div className="flex items-center gap-2 mb-3">
+                        <img src={typeof platform.logo === "string" ? platform.logo : platform.logo.src} alt={platform.name} className="w-4 h-4 object-contain" />
+                        <span className="text-xs font-medium text-muted-foreground">{platform.name}</span>
+                      </div>
+                      <p className="text-4xl font-bold text-foreground mb-3">{platform.score}%</p>
+                      <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full bg-gradient-to-r ${platform.color} transition-all duration-700`} style={{ width: `${platform.score}%` }} />
+                      </div>
+                    </Card>
+                  ))}
                 </div>
-              </Card>
-            ))}
-          </div>
+              </>
+            );
+          })()}
 
           {/* Checklist badges */}
           <div className="flex flex-wrap gap-2 mt-3">
@@ -494,8 +531,47 @@ export default function Dashboard() {
         {/* Your Overview Section */}
         <div>
           <h2 className="text-base sm:text-lg font-semibold text-foreground mb-4">Your Overview</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-            {/* Answers Generated Card */}
+
+          {/* Mobile bento */}
+          <div className="grid grid-cols-2 gap-3 sm:hidden">
+            {/* Hero: Answers */}
+            <Card className="col-span-2 relative overflow-hidden p-5 border border-border/60 bg-gradient-to-br from-primary/10 via-card to-violet-500/5">
+              <div className="absolute -right-6 -bottom-6 w-28 h-28 rounded-full bg-primary/10 blur-2xl" />
+              <div className="relative flex items-start justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-1">Answers Generated</p>
+                  <p className="text-5xl font-bold text-foreground tracking-tight">{realStats.answersCount}</p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Avg. score <span className="text-primary font-semibold">{realStats.avgScore}/100</span>
+                  </p>
+                </div>
+                <div className="w-11 h-11 rounded-xl bg-primary/15 flex items-center justify-center">
+                  <MessageSquare className="w-5 h-5 text-primary" />
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-4 border border-border/50">
+              <div className="w-9 h-9 rounded-lg bg-emerald-500/10 flex items-center justify-center mb-3">
+                <FileText className="w-4 h-4 text-emerald-500" />
+              </div>
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-1">Articles</p>
+              <p className="text-3xl font-bold text-foreground">{realStats.articlesCount}</p>
+              <p className="text-[11px] text-muted-foreground mt-1">Ready to publish</p>
+            </Card>
+
+            <Card className="p-4 border border-border/50">
+              <div className="w-9 h-9 rounded-lg bg-orange-500/10 flex items-center justify-center mb-3">
+                <TrendingUp className="w-4 h-4 text-orange-500" />
+              </div>
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-1">Reddit</p>
+              <p className="text-3xl font-bold text-foreground">{realStats.redditOpportunities}</p>
+              <p className="text-[11px] text-muted-foreground mt-1">Engagement ready</p>
+            </Card>
+          </div>
+
+          {/* Desktop: original 3-col */}
+          <div className="hidden sm:grid sm:grid-cols-3 gap-4">
             <Card className="p-5 border border-border/50">
               <div className="flex items-start justify-between">
                 <div>
@@ -511,7 +587,6 @@ export default function Dashboard() {
               </p>
             </Card>
 
-            {/* Articles Created Card */}
             <Card className="p-5 border border-border/50">
               <div className="flex items-start justify-between">
                 <div>
@@ -522,12 +597,9 @@ export default function Dashboard() {
                   <FileText className="w-5 h-5 text-emerald-500" />
                 </div>
               </div>
-              <p className="text-sm text-muted-foreground mt-2">
-                Ready to publish
-              </p>
+              <p className="text-sm text-muted-foreground mt-2">Ready to publish</p>
             </Card>
 
-            {/* Reddit Opportunities Card */}
             <Card className="p-5 border border-border/50">
               <div className="flex items-start justify-between">
                 <div>
@@ -538,24 +610,30 @@ export default function Dashboard() {
                   <TrendingUp className="w-5 h-5 text-orange-500" />
                 </div>
               </div>
-              <p className="text-sm text-muted-foreground mt-2">
-                Engagement ready
-              </p>
+              <p className="text-sm text-muted-foreground mt-2">Engagement ready</p>
             </Card>
           </div>
         </div>
 
         {/* Autopilot Modal Trigger */}
-        <Card 
-          className="p-4 sm:p-6 border border-primary/20 bg-primary/5 cursor-pointer hover:bg-primary/10 transition-colors"
+        <Card
+          className="relative overflow-hidden p-4 sm:p-6 border border-primary/20 bg-gradient-to-r from-primary/10 via-primary/5 to-violet-500/10 cursor-pointer hover:from-primary/15 hover:to-violet-500/15 transition-all active:scale-[0.99]"
           onClick={() => setShowAutopilotModal(true)}
         >
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <h3 className="font-semibold text-foreground text-sm sm:text-base">Publish Article on Autopilot</h3>
-              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">Connect your CMS to automatically publish articles</p>
+          <div className="absolute -right-4 -top-4 w-24 h-24 rounded-full bg-primary/10 blur-2xl pointer-events-none" />
+          <div className="relative flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center flex-shrink-0 sm:hidden">
+                <Bot className="w-5 h-5 text-primary" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-semibold text-foreground text-sm sm:text-base">Publish Article on Autopilot</h3>
+                <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 line-clamp-1">Connect your CMS to auto-publish articles</p>
+              </div>
             </div>
-            <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0" />
+            <div className="w-9 h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0">
+              <ArrowRight className="w-4 h-4" />
+            </div>
           </div>
         </Card>
       </div>

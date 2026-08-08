@@ -1,5 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:wght@300;400;500&family=Fraunces:ital,wght@0,300;0,700;1,300&display=swap');
+/* Fonts loaded via <link> in index.html for parallel non-blocking fetch (better LCP) */
 
 @tailwind base;
 @tailwind components;
@@ -7,79 +6,68 @@
 
 @layer base {
   :root {
-    /* AutoPilot GEO v4 design system — light mode.
-       Maps the v4 design tokens into shadcn's HSL palette so the entire
-       old app recolors to the new design without rewriting components. */
-
-    --background: 225 40% 97%;        /* #f5f6fb → paper */
-    --foreground: 230 39% 13%;        /* #14162e → ink */
-    --card: 0 0% 100%;                /* #ffffff → surface */
-    --card-foreground: 230 39% 13%;   /* #14162e → ink */
-    --popover: 0 0% 100%;             /* #ffffff → surface */
-    --popover-foreground: 230 39% 13%;/* #14162e → ink */
-
-    --primary: 232 50% 36%;           /* #2e3a8c → primary */
-    --primary-foreground: 0 0% 100%;  /* white */
-
-    --secondary: 228 33% 92%;         /* #e4e5f0 → line */
-    --secondary-foreground: 232 15% 41%; /* #585b78 → ink-soft */
-
-    --muted: 228 33% 92%;             /* #e4e5f0 → line */
-    --muted-foreground: 232 15% 41%;  /* #585b78 → ink-soft */
-
-    --accent: 229 50% 96%;            /* #eef0fb → primary-soft */
-    --accent-foreground: 232 50% 36%; /* #2e3a8c → primary */
-
-    --destructive: 0 54% 50%;         /* #c23b3b → red */
+    --background: 0 0% 99%;
+    --foreground: 240 10% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 10%;
+    --primary: 222 47% 30%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 6% 15%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
+    --accent: 222 20% 96%;
+    --accent-foreground: 222 47% 25%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-
-    --border: 228 33% 92%;            /* #e4e5f0 → line */
-    --input: 228 33% 92%;             /* #e4e5f0 → line */
-    --ring: 232 50% 36%;              /* #2e3a8c → primary */
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 222 47% 30%;
     --radius: 0.75rem;
-
-    /* Extended tokens for the new design */
-    --gradient-primary: linear-gradient(135deg, hsl(232, 50%, 36%) 0%, hsl(231, 51%, 25%) 100%);
+    
+    /* Custom AutoPilot Geo tokens - Light */
+    --gradient-primary: linear-gradient(135deg, hsl(222, 47%, 30%) 0%, hsl(222, 47%, 20%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(222, 47%, 30%) 0%, hsl(222, 47%, 20%) 100%);
+    --gradient-subtle: linear-gradient(180deg, hsl(0, 0%, 100%) 0%, hsl(240, 20%, 98%) 100%);
     --glass-bg: hsla(0, 0%, 100%, 0.85);
-    --glass-border: hsla(228, 33%, 92%, 0.6);
-    --shadow-soft: 0 4px 24px -4px hsla(232, 50%, 36%, 0.12);
-    --shadow-glow: 0 0 40px hsla(232, 50%, 36%, 0.15);
+    --glass-border: hsla(240, 10%, 85%, 0.6);
+    --shadow-soft: 0 4px 24px -4px hsla(222, 47%, 30%, 0.12);
+    --shadow-glow: 0 0 40px hsla(222, 47%, 30%, 0.15);
+    --sidebar-bg: 240 10% 98%;
   }
 
   .dark {
-    /* Dark mode: inverted palette. Inks and backgrounds swap roles. */
-    --background: 230 39% 13%;        /* #14162e → ink (now bg) */
-    --foreground: 225 40% 97%;        /* #f5f6fb → paper (now fg) */
-    --card: 231 51% 25%;              /* #1f2761 → primary-deep */
-    --card-foreground: 225 40% 97%;   /* #f5f6fb → paper */
-    --popover: 231 51% 25%;           /* #1f2761 → primary-deep */
-    --popover-foreground: 225 40% 97%;/* #f5f6fb → paper */
-
-    --primary: 232 50% 50%;           /* lighter primary for dark */
-    --primary-foreground: 230 39% 13%;/* #14162e → ink */
-
-    --secondary: 232 15% 30%;         /* darker secondary */
-    --secondary-foreground: 225 40% 97%; /* #f5f6fb → paper */
-
-    --muted: 232 15% 30%;             /* darker muted */
-    --muted-foreground: 225 30% 70%;  /* lighter muted-fg */
-
-    --accent: 232 15% 30%;            /* dark accent */
-    --accent-foreground: 225 40% 97%; /* #f5f6fb → paper */
-
-    --destructive: 0 65% 60%;         /* lighter red for dark */
-    --destructive-foreground: 225 40% 97%;
-
-    --border: 232 15% 30%;            /* darker border */
-    --input: 232 15% 30%;             /* darker input */
-    --ring: 232 50% 50%;              /* lighter primary */
-    --radius: 0.75rem;
-
-    --gradient-primary: linear-gradient(135deg, hsl(232, 50%, 45%) 0%, hsl(231, 51%, 35%) 100%);
-    --glass-bg: hsla(230, 39%, 13%, 0.8);
-    --glass-border: hsla(232, 15%, 30%, 0.5);
-    --shadow-soft: 0 4px 24px -4px hsla(232, 50%, 36%, 0.25);
-    --shadow-glow: 0 0 60px hsla(232, 50%, 36%, 0.3);
+    --background: 240 10% 4%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 6%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 6%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 222 47% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 5% 12%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 5% 14%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 240 5% 14%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 63% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5% 16%;
+    --input: 240 5% 16%;
+    --ring: 222 47% 55%;
+    
+    /* Custom AutoPilot Geo tokens - Dark */
+    --gradient-primary: linear-gradient(135deg, hsl(222, 47%, 45%) 0%, hsl(222, 47%, 35%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(222, 47%, 45%) 0%, hsl(222, 47%, 35%) 100%);
+    --gradient-subtle: linear-gradient(180deg, hsl(240, 10%, 6%) 0%, hsl(240, 10%, 4%) 100%);
+    --glass-bg: hsla(240, 10%, 8%, 0.8);
+    --glass-border: hsla(240, 5%, 20%, 0.5);
+    --shadow-soft: 0 4px 24px -4px hsla(222, 47%, 30%, 0.25);
+    --shadow-glow: 0 0 60px hsla(222, 47%, 30%, 0.3);
+    --sidebar-bg: 240 10% 6%;
   }
 }
 
@@ -94,10 +82,6 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-  }
-
-  #lovable-badge {
-    display: none !important;
   }
 }
 

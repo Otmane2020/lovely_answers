@@ -1,8 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { loadGenerationContext } from "../_shared/project-context.ts";
-import { chatCompletion } from "../_shared/ai-call.ts";
-
+import { reviewWithClaude } from "../_shared/claude-review.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -148,13 +146,11 @@ function buildArticlePrompt(
   businessType: string,
   audience: string,
   language: string,
-  contextBlocks = "",
 ): string {
   const lang = language === "fr" ? "French" : "English";
 
   return `Write a comprehensive, in-depth article optimized for both SEO and AI citation. Follow every rule exactly.
 
-${contextBlocks ? `## Project context (real data — ground every section in it, never write generic industry filler)\n${contextBlocks}\n\nSEO SPECIALISATION: this piece targets classic search rankings for the primary keyword below, while staying quotable. Reference the real pages, offering and audience above.\n` : ""}
 ## Context
 - Brand: "${brand}"
 - Website: ${website || "N/A"}
@@ -263,12 +259,6 @@ serve(async (req) => {
 
     const existingSlugs = new Set((existingArticles || []).map((a: any) => a.slug?.toLowerCase()));
 
-    // Fail-safe project context: falls back to scraping / analyze-website /
-    // existing keywords / competitors when a provider (DataForSEO) is down.
-    const { blocks: projectContextBlocks, readiness: contextReadiness, degraded: contextDegraded } =
-      await loadGenerationContext(supabase, projectId, { maxKeywords: 20 });
-    console.log(`[generate-articles] context readiness=${contextReadiness} degraded=${contextDegraded.join(" | ") || "none"}`);
-
     console.log("[generate-articles] Project: \"" + brand + "\" | Lang: " + language + " | Keywords: " + count);
 
     const generatedArticles: any[] = [];
@@ -308,19 +298,33 @@ serve(async (req) => {
       // Call AI with improved prompt
       let aiData: any;
       try {
-        aiData = await chatCompletion({
-          messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: buildArticlePrompt(keyword, brand, website, businessType, audience, language, projectContextBlocks) },
-          ],
-          temperature: 0.6,
-          max_tokens: 4000,
+        const aiRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer " + openRouterKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash",
+            messages: [
+              { role: "system", content: SYSTEM_PROMPT },
+              { role: "user", content: buildArticlePrompt(keyword, brand, website, businessType, audience, language) },
+            ],
+            temperature: 0.6,
+            max_tokens: 8000,
+          }),
         });
+
+        if (!aiRes.ok) {
+          console.error("[generate-articles] AI HTTP error: " + aiRes.status);
+          continue;
+        }
+
+        aiData = await aiRes.json();
       } catch (fetchErr) {
-        console.error("[generate-articles] AI error for \"" + keyword + "\":", fetchErr);
+        console.error("[generate-articles] Fetch error for \"" + keyword + "\":", fetchErr);
         continue;
       }
-
 
       const rawContent = aiData.choices?.[0]?.message?.content;
       if (!rawContent) {
@@ -338,19 +342,27 @@ serve(async (req) => {
           .trim();
         articleData = JSON.parse(cleaned);
       } catch (_parseErr) {
-        console.error("[generate-articles] JSON parse failed for \"" + keyword + "\", using fallback");
-        articleData = {
-          title: keyword + " - Complete Guide 2026",
-          content: rawContent,
-          metaDescription: "Everything you need to know about " + keyword + " - by " + brand + ".",
-          headings: [],
-          internalLinks: [],
-          faqs: [],
-          jsonLdSchema: null,
-        };
+        // NO FALLBACK - skip this keyword instead of publishing raw/unstructured content
+        console.error("[generate-articles] JSON parse failed for \"" + keyword + "\" — skipping (no fallback)");
+        continue;
       }
 
-      const content = articleData.content || rawContent;
+
+      let content = articleData.content || rawContent;
+
+      // ── Claude review (post-generation polish) ──
+      if (content) {
+        const reviewed = await reviewWithClaude({
+          content,
+          contentType: "article",
+          language,
+          brand,
+          topic: keyword,
+        });
+        content = reviewed.content;
+        articleData.content = content;
+      }
+
       const wordCount = countWords(content);
       const faqs = articleData.faqs || [];
 

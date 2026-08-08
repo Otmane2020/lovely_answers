@@ -1,4 +1,5 @@
 "use client";
+import { Helmet } from "react-helmet-async";
 import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -155,6 +156,14 @@ export default function AeoSeoAudit() {
 
   return (
     <DashboardLayout>
+      <Helmet>
+        <title>SEO Audit — AutoPilot Geo</title>
+        <meta name="description" content="Audit your website for technical SEO and AEO issues, get prioritized fixes and a score for AI-search visibility." />
+        <meta property="og:title" content="SEO Audit — AutoPilot Geo" />
+        <meta property="og:description" content="Audit your website for technical SEO and AEO issues, get prioritized fixes and a score for AI-search visibility." />
+        <link rel="canonical" href="https://autopilotgeo.com/seo-audit" />
+        <meta property="og:url" content="https://autopilotgeo.com/seo-audit" />
+      </Helmet>
       <div className="space-y-8">
         <PageHeader
           icon={Search}

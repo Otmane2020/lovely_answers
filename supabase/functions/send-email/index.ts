@@ -34,7 +34,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     switch (data.type) {
       case "welcome":
-        subject = "Bienvenue sur AutoPilot Geo! 🎉";
+        subject = "Welcome to AutoPilot Geo! 🎉";
         html = `
           <!DOCTYPE html>
           <html>
@@ -44,33 +44,33 @@ const handler = async (req: Request): Promise<Response> => {
           </head>
           <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
             <div style="text-align: center; margin-bottom: 30px;">
-              <h1 style="color: #2e3a8c; margin: 0;">Bienvenue sur AutoPilot Geo! 🎉</h1>
+              <h1 style="color: #7c3aed; margin: 0;">Welcome to AutoPilot Geo! 🎉</h1>
             </div>
-            
-            <p>Bonjour ${data.name || ""},</p>
-            
-            <p>Merci de nous avoir rejoint! Nous sommes ravis de vous compter parmi nous.</p>
-            
-            <p>Avec AutoPilot Geo, vous pouvez:</p>
+
+            <p>Hi ${data.name || "there"},</p>
+
+            <p>Thanks for joining! We're thrilled to have you on board.</p>
+
+            <p>With AutoPilot Geo, you can:</p>
             <ul>
-              <li>🚀 Générer des réponses AEO optimisées pour les moteurs de recherche</li>
-              <li>📝 Créer des articles de blog automatiquement</li>
-              <li>📊 Suivre vos performances avec Google Search Console</li>
-              <li>🔗 Publier directement sur WordPress, Shopify, Wix et plus</li>
+              <li>🚀 Generate AEO answers optimized for AI search engines</li>
+              <li>📝 Create blog articles automatically</li>
+              <li>📊 Track performance with Google Search Console</li>
+              <li>🔗 Publish directly to WordPress, Shopify, Wix and more</li>
             </ul>
-            
+
             <div style="text-align: center; margin: 30px 0;">
-              <a href="https://app.autopilotgeo.com/dashboard" style="background: linear-gradient(135deg, #2e3a8c, #5f6ce0); color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: 600;">Accéder à mon dashboard</a>
+              <a href="https://app.autopilotgeo.com/dashboard" style="background: linear-gradient(135deg, #7c3aed, #a855f7); color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: 600;">Go to my dashboard</a>
             </div>
-            
-            <p>Si vous avez des questions, n'hésitez pas à nous contacter via le support.</p>
-            
-            <p>À bientôt,<br><strong>L'équipe AutoPilot Geo</strong></p>
-            
+
+            <p>If you have any questions, feel free to reach out to support.</p>
+
+            <p>Talk soon,<br><strong>The AutoPilot Geo Team</strong></p>
+
             <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
             <p style="font-size: 12px; color: #888; text-align: center;">
-              AutoPilot Geo - Optimisez votre contenu pour l'ère de l'IA<br>
-              <a href="https://autopilotgeo.com" style="color: #2e3a8c;">autopilotgeo.com</a>
+              AutoPilot Geo — Optimize your content for the AI era<br>
+              <a href="https://autopilotgeo.com" style="color: #7c3aed;">autopilotgeo.com</a>
             </p>
           </body>
           </html>
@@ -78,7 +78,7 @@ const handler = async (req: Request): Promise<Response> => {
         break;
 
       case "ticket_created":
-        subject = `Ticket reçu: ${data.ticketSubject || "Votre demande"}`;
+        subject = `Ticket received: ${data.ticketSubject || "Your request"}`;
         html = `
           <!DOCTYPE html>
           <html>
@@ -86,25 +86,25 @@ const handler = async (req: Request): Promise<Response> => {
             <meta charset="utf-8">
           </head>
           <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h2 style="color: #2e3a8c;">Nous avons bien reçu votre demande 📩</h2>
-            
-            <p>Bonjour ${data.name || ""},</p>
-            
-            <p>Votre ticket de support a été créé avec succès. Notre équipe va l'examiner et vous répondre dans les plus brefs délais.</p>
-            
+            <h2 style="color: #7c3aed;">We've received your request 📩</h2>
+
+            <p>Hi ${data.name || "there"},</p>
+
+            <p>Your support ticket has been created successfully. Our team will review it and get back to you as soon as possible.</p>
+
             <div style="background: #f4f4f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
-              <p style="margin: 0;"><strong>Sujet:</strong> ${data.ticketSubject}</p>
-              <p style="margin: 10px 0 0;"><strong>Votre message:</strong></p>
+              <p style="margin: 0;"><strong>Subject:</strong> ${data.ticketSubject}</p>
+              <p style="margin: 10px 0 0;"><strong>Your message:</strong></p>
               <p style="margin: 5px 0 0; color: #555;">${data.message}</p>
             </div>
-            
-            <p>Vous pouvez suivre l'état de votre ticket depuis votre dashboard.</p>
-            
-            <p>Cordialement,<br><strong>L'équipe Support AutoPilot Geo</strong></p>
+
+            <p>You can track your ticket status from your dashboard.</p>
+
+            <p>Best regards,<br><strong>The AutoPilot Geo Support Team</strong></p>
 
             <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
             <p style="font-size: 12px; color: #888; text-align: center;">
-              Cet email a été envoyé automatiquement. Répondez directement à ce mail pour continuer la conversation.
+              This email was sent automatically. Reply directly to this email to continue the conversation.
             </p>
           </body>
           </html>
@@ -112,7 +112,7 @@ const handler = async (req: Request): Promise<Response> => {
         break;
 
       case "ticket_reply":
-        subject = `Réponse à votre ticket: ${data.ticketSubject || "Support"}`;
+        subject = `Reply to your ticket: ${data.ticketSubject || "Support"}`;
         html = `
           <!DOCTYPE html>
           <html>
@@ -120,25 +120,25 @@ const handler = async (req: Request): Promise<Response> => {
             <meta charset="utf-8">
           </head>
           <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h2 style="color: #2e3a8c;">Nouvelle réponse à votre ticket 💬</h2>
-            
-            <p>Bonjour ${data.name || ""},</p>
-            
-            <p>Notre équipe support a répondu à votre demande:</p>
-            
+            <h2 style="color: #7c3aed;">New reply to your ticket 💬</h2>
+
+            <p>Hi ${data.name || "there"},</p>
+
+            <p>Our support team has replied to your request:</p>
+
             <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; border-left: 4px solid #22c55e; margin: 20px 0;">
               <p style="margin: 0; white-space: pre-wrap;">${data.message}</p>
             </div>
-            
+
             <div style="text-align: center; margin: 30px 0;">
-              <a href="https://app.autopilotgeo.com/support" style="background: linear-gradient(135deg, #2e3a8c, #5f6ce0); color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: 600;">Voir la conversation</a>
+              <a href="https://app.autopilotgeo.com/support" style="background: linear-gradient(135deg, #7c3aed, #a855f7); color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: 600;">View conversation</a>
             </div>
-            
-            <p>Cordialement,<br><strong>L'équipe Support AutoPilot Geo</strong></p>
-            
+
+            <p>Best regards,<br><strong>The AutoPilot Geo Support Team</strong></p>
+
             <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
             <p style="font-size: 12px; color: #888; text-align: center;">
-              Répondez directement à ce mail pour continuer la conversation.
+              Reply directly to this email to continue the conversation.
             </p>
           </body>
           </html>
@@ -146,26 +146,26 @@ const handler = async (req: Request): Promise<Response> => {
         break;
 
       case "test":
-        subject = "✅ Email test — AutoPilot Geo";
+        subject = "✅ Test email — AutoPilot Geo";
         html = `
           <!DOCTYPE html>
           <html>
           <head><meta charset="utf-8"></head>
           <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
             <div style="text-align: center; margin-bottom: 30px;">
-              <h1 style="color: #2e3a8c;">Email test réussi! ✅</h1>
+              <h1 style="color: #7c3aed;">Test email successful! ✅</h1>
             </div>
-            <p>Bonjour ${data.name || ""},</p>
-            <p>Ceci est un email de test envoyé depuis <strong>AutoPilot Geo</strong>.</p>
-            <p>Si vous recevez cet email, votre configuration fonctionne correctement.</p>
+            <p>Hi ${data.name || "there"},</p>
+            <p>This is a test email sent from <strong>AutoPilot Geo</strong>.</p>
+            <p>If you received this email, your setup is working correctly.</p>
             <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; border-left: 4px solid #22c55e; margin: 20px 0;">
-              <p style="margin: 0;">📧 Expéditeur: <strong>support@autopilotgeo.com</strong></p>
-              <p style="margin: 5px 0 0;">🕐 Envoyé le: <strong>${new Date().toLocaleString("fr-FR", { timeZone: "Europe/Paris" })}</strong></p>
+              <p style="margin: 0;">📧 Sender: <strong>support@autopilotgeo.com</strong></p>
+              <p style="margin: 5px 0 0;">🕐 Sent at: <strong>${new Date().toUTCString()}</strong></p>
             </div>
-            <p>Cordialement,<br><strong>L'équipe AutoPilot Geo</strong></p>
+            <p>Best regards,<br><strong>The AutoPilot Geo Team</strong></p>
             <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
             <p style="font-size: 12px; color: #888; text-align: center;">
-              <a href="https://autopilotgeo.com" style="color: #2e3a8c;">autopilotgeo.com</a>
+              <a href="https://autopilotgeo.com" style="color: #7c3aed;">autopilotgeo.com</a>
             </p>
           </body>
           </html>
@@ -173,7 +173,7 @@ const handler = async (req: Request): Promise<Response> => {
         break;
 
       case "custom":
-        subject = data.subject || "Message de AutoPilot Geo";
+        subject = data.subject || "Message from AutoPilot Geo";
         html = data.html || `<p>${data.message}</p>`;
         break;
 
@@ -194,6 +194,9 @@ const handler = async (req: Request): Promise<Response> => {
         subject,
         html,
         reply_to: "support@autopilotgeo.com",
+        ...(Array.isArray(data.attachments) && data.attachments.length > 0
+          ? { attachments: data.attachments }
+          : {}),
       }),
     });
 

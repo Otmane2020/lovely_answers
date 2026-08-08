@@ -16,6 +16,7 @@ import { useIntegrations, useDeleteIntegration } from "@/hooks/useIntegrations";
 import { useActiveProject } from "@/hooks/useProjects";
 import { supabase } from "@/integrations/supabase/client";
 import { useSubscriptionContext } from "@/contexts/SubscriptionContext";
+import { usePlanFeatures } from "@/hooks/usePlanFeatures";
 import { useGoogleSearchConsole } from "@/hooks/useGoogleSearchConsole";
 import { useGoogleBusiness } from "@/hooks/useGoogleBusiness";
 import { IntegrationConfigModal } from "@/components/integrations/IntegrationConfigModal";
@@ -61,14 +62,21 @@ export default function AeoIntegrations() {
   const deleteIntegration = useDeleteIntegration();
   const { isConnected: gscConnected, isLoading: gscLoading, refetch: refetchGsc } = useGoogleSearchConsole();
   const { isSubscribed } = useSubscriptionContext();
-  const { 
-    isConnected: gmbConnected, 
-    locations: gmbLocations, 
-    selectedLocationIds: gmbSelectedIds, 
-    isLoading: gmbLoading, 
+  const { features } = usePlanFeatures();
+  const STARTER_CMS = new Set(["wordpress", "shopify"]);
+  const isCmsAllowed = (id: string) =>
+    features.allCms || STARTER_CMS.has(id) || ["api", "webhook"].includes(id);
+  const {
+    isConnected: gmbConnected,
+    locations: gmbLocations,
+    selectedLocationIds: gmbSelectedIds,
+    isLoading: gmbLoading,
     toggleLocation: toggleGmbLocation,
     connectGMB,
+    error: gmbError,
+    disconnectGMB,
   } = useGoogleBusiness();
+  const [isExchangingGmb, setIsExchangingGmb] = useState(false);
   const router = useRouter();
 
   const [showPaywall, setShowPaywall] = useState(false);
@@ -113,8 +121,10 @@ export default function AeoIntegrations() {
   ];
 
   const frequencies = [
-    { value: "daily", label: "Daily" },
-    { value: "weekly", label: "Weekly (Mon)" },
+    { value: "3x_week", label: "3x/week (recommended)" },
+    { value: "2x_week", label: "2x/week" },
+    { value: "daily",   label: "Daily" },
+    { value: "weekly",  label: "Weekly (Mon)" },
     { value: "monthly", label: "Monthly (1st)" },
   ];
 
@@ -201,46 +211,90 @@ export default function AeoIntegrations() {
     savePublishSettings({ publish_frequency: freq });
   };
 
-  // Handle OAuth callback for Google Search Console
+  // Handle OAuth callback for Google Search Console / Google Business
   useEffect(() => {
     const handleOAuthCallback = async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get("code");
       const state = urlParams.get("state");
 
-      if (code && state) {
-        setConnectingGsc(true);
-        try {
-          // We must pass the same redirectUri used to start the OAuth flow.
-          // Store it before redirecting to Google, then read it back here.
-          const redirectUri = sessionStorage.getItem("gsc_oauth_redirect_uri") ||
-            `${window.location.origin}/integrations`;
+      if (!code || !state) return;
 
-          const { data, error } = await supabase.functions.invoke("google-oauth-token", {
-            body: { code, state, redirectUri },
+      // Immediately clear the URL to prevent double-exchange on re-render
+      window.history.replaceState({}, document.title, window.location.pathname);
+
+      let parsedState: { type?: string; projectId?: string } = {};
+      try {
+        parsedState = JSON.parse(atob(state));
+      } catch {
+        parsedState = {};
+      }
+
+      if (parsedState.type === "gmb") {
+        setIsExchangingGmb(true);
+        try {
+          const redirectUri = `${window.location.origin}/integrations`;
+          const { data, error } = await supabase.functions.invoke("gmb-oauth-token", {
+            body: {
+              code,
+              redirectUri,
+              projectId: project?.id || parsedState.projectId,
+            },
           });
 
           if (error) throw error;
           if (!data?.success) {
-            const msg = [data?.error, data?.details].filter(Boolean).join("\n");
+            const msg = [data?.error, data?.details].filter(Boolean).join(" — ");
             throw new Error(msg || "Failed to connect");
           }
 
-          toast.success("Google Search Console connecté avec succès!");
-          refetchGsc();
-          sessionStorage.removeItem("gsc_oauth_redirect_uri");
-          window.history.replaceState({}, document.title, window.location.pathname);
+          toast.success("Google My Business connecté avec succès!");
+          let returnTo: string | null = null;
+          try { returnTo = sessionStorage.getItem("gmb_return_to"); sessionStorage.removeItem("gmb_return_to"); } catch {}
+          if (returnTo && returnTo !== "/integrations") {
+            window.location.href = returnTo;
+          } else {
+            window.location.reload();
+          }
+
         } catch (error: any) {
-          console.error("OAuth callback error:", error);
+          console.error("GMB OAuth callback error:", error);
           toast.error("Erreur de connexion: " + (error.message || "Unknown error"));
         } finally {
-          setConnectingGsc(false);
+          setIsExchangingGmb(false);
         }
+        return;
+      }
+
+      setConnectingGsc(true);
+      try {
+        const redirectUri = sessionStorage.getItem("gsc_oauth_redirect_uri") ||
+          `${window.location.origin}/integrations`;
+
+        const { data, error } = await supabase.functions.invoke("google-oauth-token", {
+          body: { code, state, redirectUri },
+        });
+
+        if (error) throw error;
+        if (!data?.success) {
+          const msg = [data?.error, data?.details].filter(Boolean).join("\n");
+          throw new Error(msg || "Failed to connect");
+        }
+
+        toast.success("Google Search Console connecté avec succès!");
+        refetchGsc();
+        sessionStorage.removeItem("gsc_oauth_redirect_uri");
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } catch (error: any) {
+        console.error("OAuth callback error:", error);
+        toast.error("Erreur de connexion: " + (error.message || "Unknown error"));
+      } finally {
+        setConnectingGsc(false);
       }
     };
 
     handleOAuthCallback();
-  }, [refetchGsc]);
+  }, [project?.id, refetchGsc]);
 
   // Load available GSC sites when connected
   useEffect(() => {
@@ -394,6 +448,10 @@ export default function AeoIntegrations() {
   const handleCMSClick = (platformId: string) => {
     if (!isSubscribed) {
       setShowPaywall(true);
+      return;
+    }
+    if (!isCmsAllowed(platformId)) {
+      toast.error("This CMS requires the Pro or Agency plan. Upgrade to unlock all CMS integrations.");
       return;
     }
     const existing = getConnectedIntegration(platformId);
@@ -621,265 +679,8 @@ export default function AeoIntegrations() {
             )}
           </div>
 
-          {/* Indexation Test Section */}
-          {gscConnected && (
-            <div className="mt-4 pt-4 border-t border-border">
-              <h4 className="font-medium text-sm mb-3 flex items-center gap-2">
-                <Globe className="h-4 w-4 text-primary" />
-                Test Indexation
-              </h4>
-              <p className="text-xs text-muted-foreground mb-3">
-                Submit a URL to Google for indexation. Use this to quickly index new published articles.
-              </p>
-              
-              {/* GSC Property Selector */}
-              <div className="mb-3">
-                <Label className="text-xs text-muted-foreground mb-1.5 block">Search Console Property</Label>
-                {loadingGscSites ? (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Loading properties...
-                  </div>
-                ) : gscSites.length > 0 ? (
-                  <Select value={selectedGscSite} onValueChange={setSelectedGscSite}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select a property" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {gscSites.map((site) => (
-                        <SelectItem key={site} value={site}>
-                          {site.replace("sc-domain:", "🌐 ")}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <p className="text-xs text-amber-600">No properties found. Make sure you have access to Search Console.</p>
-                )}
-              </div>
+          {/* Indexation Test section removed */}
 
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="url"
-                    placeholder="https://yoursite.com/blog/article-slug"
-                    value={testIndexUrl}
-                    onChange={(e) => setTestIndexUrl(e.target.value)}
-                    className="pl-10"
-                    disabled={isTestingIndex}
-                  />
-                </div>
-                <Button
-                  onClick={handleTestIndexation}
-                  disabled={isTestingIndex || !testIndexUrl.trim() || !selectedGscSite}
-                  className="gap-2 min-w-[140px]"
-                >
-                  {isTestingIndex ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Testing...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4" />
-                      Request Index
-                    </>
-                  )}
-                </Button>
-              </div>
-
-              {/* Test Result */}
-              {indexTestResult && (
-                <div
-                  className={`mt-3 p-3 rounded-lg text-sm ${
-                    indexTestResult.success
-                      ? "bg-green-500/10 text-green-700 dark:text-green-400 border border-green-500/20"
-                      : "bg-destructive/10 text-destructive border border-destructive/20"
-                  }`}
-                >
-                  <div className="flex items-start gap-2">
-                    {indexTestResult.success ? (
-                      <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
-                    ) : (
-                      <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-                    )}
-                    <div className="flex-1 space-y-2">
-                      <span>{indexTestResult.message}</span>
-                      
-                      {/* Show hint to use diagnostic */}
-                      {indexTestResult.hint && (
-                        <p className="text-xs opacity-80 italic">{indexTestResult.hint}</p>
-                      )}
-                      
-                      {/* Show error details if available */}
-                      {indexTestResult.errorDetails && (
-                        <Collapsible>
-                          <CollapsibleTrigger className="flex items-center gap-1 text-xs underline opacity-70 hover:opacity-100">
-                            <ChevronRight className="h-3 w-3" />
-                            Détails techniques
-                          </CollapsibleTrigger>
-                          <CollapsibleContent className="mt-2 p-2 bg-background/50 rounded text-xs font-mono space-y-1">
-                            {indexTestResult.errorDetails.consumerProject && (
-                              <div className="flex items-center justify-between">
-                                <span>Projet: {indexTestResult.errorDetails.consumerProject}</span>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-5 w-5"
-                                  onClick={() => handleCopy(indexTestResult.errorDetails.consumerProject, "Projet ID")}
-                                >
-                                  {copiedText === "Projet ID" ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                                </Button>
-                              </div>
-                            )}
-                            {indexTestResult.errorDetails.reason && (
-                              <div>Raison: {indexTestResult.errorDetails.reason}</div>
-                            )}
-                            {indexTestResult.errorDetails.code && (
-                              <div>Code: {indexTestResult.errorDetails.code}</div>
-                            )}
-                          </CollapsibleContent>
-                        </Collapsible>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-
-              {/* Diagnostic Results Panel */}
-              {showDiagnostic && diagnosticResult && (
-                <div className="mt-4 p-4 rounded-lg border border-border bg-muted/30 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h5 className="font-medium text-sm flex items-center gap-2">
-                      <Stethoscope className="h-4 w-4 text-primary" />
-                      Rapport de diagnostic
-                    </h5>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowDiagnostic(false)}
-                      className="h-6 px-2 text-xs"
-                    >
-                      Fermer
-                    </Button>
-                  </div>
-
-                  {/* Token Info */}
-                  <div className="space-y-2">
-                    <h6 className="text-xs font-medium text-muted-foreground uppercase">Token OAuth</h6>
-                    <div className="p-2 rounded bg-background border text-xs space-y-1">
-                      <div className="flex items-center gap-2">
-                        {diagnosticResult.tokenInfo?.valid ? (
-                          <CheckCircle2 className="h-3 w-3 text-green-500" />
-                        ) : (
-                          <AlertCircle className="h-3 w-3 text-destructive" />
-                        )}
-                        <span>{diagnosticResult.tokenInfo?.valid ? "Valide" : "Invalide"}</span>
-                      </div>
-                      {diagnosticResult.tokenInfo?.clientId && (
-                        <div className="flex items-center justify-between text-muted-foreground">
-                          <span>Client ID: {diagnosticResult.tokenInfo.clientId.substring(0, 30)}...</span>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-5 w-5"
-                            onClick={() => handleCopy(diagnosticResult.tokenInfo.clientId, "Client ID")}
-                          >
-                            {copiedText === "Client ID" ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                          </Button>
-                        </div>
-                      )}
-                      {diagnosticResult.tokenInfo?.scopes && (
-                        <div className="text-muted-foreground">
-                          Scopes: {diagnosticResult.tokenInfo.scopes.length} 
-                          {diagnosticResult.tokenInfo.scopes.some((s: string) => s.includes("indexing")) && (
-                            <Badge variant="outline" className="ml-2 text-green-600 border-green-600/30">indexing ✓</Badge>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* API Test Result */}
-                  <div className="space-y-2">
-                    <h6 className="text-xs font-medium text-muted-foreground uppercase">Test API Indexing</h6>
-                    <div className={`p-2 rounded border text-xs space-y-1 ${
-                      diagnosticResult.indexingApiTest?.success 
-                        ? "bg-green-500/10 border-green-500/30" 
-                        : "bg-destructive/10 border-destructive/30"
-                    }`}>
-                      <div className="flex items-center gap-2">
-                        {diagnosticResult.indexingApiTest?.success ? (
-                          <CheckCircle2 className="h-3 w-3 text-green-500" />
-                        ) : (
-                          <AlertCircle className="h-3 w-3 text-destructive" />
-                        )}
-                        <span>
-                          {diagnosticResult.indexingApiTest?.success 
-                            ? `Succès (${diagnosticResult.indexingApiTest.notifyTime || "OK"})` 
-                            : `Échec: ${diagnosticResult.indexingApiTest?.error || "Unknown"}`}
-                        </span>
-                      </div>
-                      {diagnosticResult.indexingApiTest?.errorDetails && (
-                        <div className="mt-2 p-2 bg-background/50 rounded font-mono text-xs">
-                          {diagnosticResult.indexingApiTest.errorDetails.consumerProject && (
-                            <div className="flex items-center justify-between">
-                              <span>Consumer: {diagnosticResult.indexingApiTest.errorDetails.consumerProject}</span>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-5 w-5"
-                                onClick={() => handleCopy(
-                                  diagnosticResult.indexingApiTest.errorDetails.consumerProject.replace("projects/", ""), 
-                                  "Project Number"
-                                )}
-                              >
-                                {copiedText === "Project Number" ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                              </Button>
-                            </div>
-                          )}
-                          {diagnosticResult.indexingApiTest.errorDetails.reason && (
-                            <div>Reason: {diagnosticResult.indexingApiTest.errorDetails.reason}</div>
-                          )}
-                          {diagnosticResult.indexingApiTest.errorDetails.service && (
-                            <div>Service: {diagnosticResult.indexingApiTest.errorDetails.service}</div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Recommendations */}
-                  {diagnosticResult.recommendations && diagnosticResult.recommendations.length > 0 && (
-                    <div className="space-y-2">
-                      <h6 className="text-xs font-medium text-muted-foreground uppercase">Recommandations</h6>
-                      <div className="space-y-2">
-                        {diagnosticResult.recommendations.map((rec: string, idx: number) => (
-                          <div key={idx} className="p-2 rounded bg-background border text-sm">
-                            {rec.startsWith("➡️") && rec.includes("http") ? (
-                              <a 
-                                href={rec.replace("➡️ Activez l'API ici: ", "")}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-primary hover:underline flex items-center gap-1"
-                              >
-                                {rec}
-                                <ExternalLink className="h-3 w-3" />
-                              </a>
-                            ) : (
-                              rec
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Not Connected Message */}
           {!gscConnected && !gscLoading && (
@@ -912,8 +713,8 @@ export default function AeoIntegrations() {
                 Connected
               </Badge>
             ) : (
-              <Button onClick={connectGMB} disabled={gmbLoading} className="gap-2">
-                {gmbLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
+              <Button onClick={connectGMB} disabled={gmbLoading || isExchangingGmb} className="gap-2">
+                {gmbLoading || isExchangingGmb ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
                 Connect
               </Button>
             )}
@@ -962,6 +763,17 @@ export default function AeoIntegrations() {
                     {gmbSelectedIds.length} store{gmbSelectedIds.length !== 1 ? "s" : ""} selected — scheduled content will auto-post to these locations
                   </p>
                 </div>
+              ) : gmbError ? (
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm text-destructive flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    {gmbError}
+                  </p>
+                  <Button variant="outline" size="sm" onClick={async () => { await disconnectGMB(); connectGMB(); }} className="w-fit gap-2">
+                    <ExternalLink className="h-4 w-4" />
+                    Reconnect
+                  </Button>
+                </div>
               ) : (
                 <p className="text-sm text-muted-foreground">No locations found on your Google Business account.</p>
               )}
@@ -978,6 +790,7 @@ export default function AeoIntegrations() {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {CMS_INTEGRATIONS.map((integration) => {
               const isConnected = !!getConnectedIntegration(integration.id);
+              const allowed = isCmsAllowed(integration.id);
               return (
                 <button
                   key={integration.id}
@@ -986,11 +799,16 @@ export default function AeoIntegrations() {
                     isConnected
                       ? "border-green-500/50 bg-green-500/5"
                       : "border-border hover:border-primary/50 hover:bg-muted/30"
-                  }`}
+                  } ${!allowed ? "opacity-60" : ""}`}
                 >
                   {isConnected && (
                     <div className="absolute top-2 right-2">
                       <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    </div>
+                  )}
+                  {!allowed && (
+                    <div className="absolute top-1 left-1 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                      Pro
                     </div>
                   )}
                   <div className="h-10 w-10 mx-auto mb-2 flex items-center justify-center">
@@ -1008,13 +826,14 @@ export default function AeoIntegrations() {
                   <p className={`text-xs mt-1 transition-opacity ${
                     isConnected ? "text-green-600 opacity-100" : "text-primary opacity-0 group-hover:opacity-100"
                   }`}>
-                    {isConnected ? "Connected" : "Configure"}
+                    {isConnected ? "Connected" : allowed ? "Configure" : "Upgrade to unlock"}
                   </p>
                 </button>
               );
             })}
           </div>
         </Card>
+
 
         {/* Publishing Settings */}
         <Card className="p-6">

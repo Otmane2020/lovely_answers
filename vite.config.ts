@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
+import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/supabase/vite";
 import path from "path";
 
 const supabaseUrl =
@@ -23,7 +24,7 @@ export default defineConfig(() => ({
     host: "::",
     port: 8080,
   },
-  plugins: [react()],
+  plugins: [react(), mcpPlugin()],
   define: {
     "process.env.NEXT_PUBLIC_SUPABASE_URL": JSON.stringify(supabaseUrl),
     "process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(supabasePublishableKey),

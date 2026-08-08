@@ -1,5 +1,6 @@
 "use client";
 import { useMemo } from "react";
+import { sanitizeHtml } from "@/lib/sanitize";
 import Link from "next/link";
 import { Helmet } from "react-helmet-async";
 import { Button } from "@/components/ui/button";
@@ -53,7 +54,7 @@ function extractExcerpt(html: string, maxLen = 180): string {
 }
 
 function injectHeadingIds(html: string): string {
-  return html.replace(/<h([2-3])([^>]*)>(.*?)<\/h\1>/gi, (_, level, attrs, inner) => {
+  return html.replace(/<h([2-3])([^>]*)>([\s\S]*?)<\/h\1>/gi, (_, level, attrs, inner) => {
     const text = inner.replace(/<[^>]*>/g, "").trim();
     const id = text
       .toLowerCase()
@@ -61,6 +62,106 @@ function injectHeadingIds(html: string): string {
       .replace(/^-|-$/g, "");
     return `<h${level}${attrs} id="${id}">${inner}</h${level}>`;
   });
+}
+
+/**
+ * Normalize article body:
+ *  - Strip leading <h1> (rendered separately as the page title)
+ *  - Convert Markdown (##, ###, *, -, **bold**, links) to HTML when present
+ *  - Auto-close orphaned <h1|h2|h3> tags so the rest of the article isn't
+ *    rendered inside a giant heading (the actual bug behind the "tout en gras")
+ */
+function normalizeContent(raw: string): string {
+  if (!raw) return "";
+  let html = raw.trim();
+
+  // 0. Strip inline `style=""` and most class attributes
+  html = html.replace(/\sstyle\s*=\s*"[^"]*"/gi, "");
+  html = html.replace(/\sstyle\s*=\s*'[^']*'/gi, "");
+  const allowedClasses = new Set(["lead", "key-answer", "key-answer-label", "comparison-table", "checklist", "warning-box", "tip-box", "stats-row", "stat-card", "stat-number", "stat-label", "faq-item", "faq-question", "faq-answer"]);
+  html = html.replace(/\sclass\s*=\s*(["'])([^"']*)\1/gi, (_, quote, value) => {
+    const kept = String(value).split(/\s+/).filter((cls) => allowedClasses.has(cls));
+    return kept.length ? ` class=${quote}${kept.join(" ")}${quote}` : "";
+  });
+
+  // 0.b Unwrap outer wrappers
+  html = html.replace(/<\/?article[^>]*>/gi, "");
+  html = html.replace(/<\/?section[^>]*>/gi, "");
+
+  // 1. Drop H1 (rendered in the hero)
+  html = html.replace(/<h1[^>]*>[\s\S]*?<\/h1>/gi, "").trim();
+  html = html.replace(/<h1[^>]*>/gi, "");
+
+  // 1.b CRITICAL: generated articles often produce one giant unstructured paragraph
+  // mixing raw <h2>/<h3> openings AND inline markdown (##, ### , *   ).
+  // Force these patterns to become block boundaries before further parsing.
+  html = html.replace(/\s*<h([23])([^>]*)>/gi, "\n\n<h$1$2>");
+  html = html.replace(/([^\n])\s{2,}(#{2,3}\s+)/g, "$1\n\n$2");
+  html = html.replace(/([^\n])\s{2,}(\*\s{2,}\*\*)/g, "$1\n\n$2");
+  html = html.replace(/([^\n])\s{2,}(\*\s+(?=\S))/g, "$1\n\n* ");
+
+  // 2. Auto-close orphan headings: extract first sentence as heading text,
+  //    push the remainder into a paragraph.
+  html = html.replace(
+    /<h([1-6])([^>]*)>([\s\S]*?)(?=<h[1-6][\s>]|<\/?(?:p|div|ul|ol|section|article|blockquote)[\s>]|$)/gi,
+    (full, lvl, attrs, inner) => {
+      const closeRe = new RegExp(`</h${lvl}>`, "i");
+      if (closeRe.test(inner)) return full;
+      const stripped = inner.replace(/<[^>]*>/g, "").trim();
+      if (!stripped) return `<h${lvl}${attrs}></h${lvl}>`;
+      let headText = "";
+      const sentenceMatch = stripped.match(/^(.{5,140}?[.?!:])(?:\s|$)/);
+      if (sentenceMatch) {
+        headText = sentenceMatch[1].replace(/[.?!:]+$/, "").trim();
+      } else {
+        const slice = stripped.slice(0, 90);
+        headText = slice.replace(/\s\S*$/, "").trim() || slice.trim();
+      }
+      const restText = stripped.slice(headText.length).replace(/^[.?!:\s]+/, "").trim();
+      const restHtml = restText ? `\n\n${restText}` : "";
+      return `<h${lvl}${attrs}>${headText}</h${lvl}>${restHtml}`;
+    }
+  );
+
+  // 2.b Unwrap <p>...</p> that now contain block elements
+  html = html.replace(/<p>([\s\S]*?)<\/p>/gi, (m, inner) => {
+    if (/<(h[1-6]|ul|ol|li|blockquote|table)\b/i.test(inner)) return inner;
+    return m;
+  });
+
+  // 3. Markdown → HTML
+  const looksMarkdown = /(^|\n)\s*(#{2,3} |[*\-] |\d+\.\s)/.test(html) || /\*\*[^*]+\*\*/.test(html);
+  if (looksMarkdown) {
+    html = html.replace(/^\s*###\s+(.+)$/gm, "<h3>$1</h3>");
+    html = html.replace(/^\s*##\s+(.+)$/gm, "<h2>$1</h2>");
+    html = html.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+    html = html.replace(/(?:^|\n)((?:\s*[*\-]\s+.+\n?)+)/g, (_, block) => {
+      const items = block
+        .trim()
+        .split(/\n/)
+        .map((l: string) => l.replace(/^\s*[*\-]\s+/, "").trim())
+        .filter(Boolean)
+        .map((t: string) => `<li>${t}</li>`)
+        .join("");
+      return `\n<ul>${items}</ul>\n`;
+    });
+    html = html
+      .split(/\n{2,}/)
+      .map((chunk) => {
+        const t = chunk.trim();
+        if (!t) return "";
+        if (/^\s*<(h[1-6]|ul|ol|li|p|blockquote|pre|table|div|section|article|figure|img)/i.test(t)) return t;
+        return `<p>${t}</p>`;
+      })
+      .join("\n");
+  }
+
+  // 4. Tidy
+  html = html.replace(/<p>\s*(<h[1-6][^>]*>[\s\S]*?<\/h[1-6]>)\s*<\/p>/gi, "$1");
+  html = html.replace(/<p>\s*<\/p>/gi, "");
+
+  return html;
 }
 
 export default function ArticleTemplate({
@@ -74,13 +175,14 @@ export default function ArticleTemplate({
   const brand = "AutoPilot Geo";
   const brandUrl = "https://autopilotgeo.com";
 
-  const readingTime = useMemo(() => estimateReadingTime(htmlContent), [htmlContent]);
-  const headings = useMemo(() => extractHeadings(htmlContent), [htmlContent]);
+  const normalizedHtml = useMemo(() => normalizeContent(htmlContent), [htmlContent]);
+  const readingTime = useMemo(() => estimateReadingTime(normalizedHtml), [normalizedHtml]);
+  const headings = useMemo(() => extractHeadings(normalizedHtml), [normalizedHtml]);
   const excerpt = useMemo(
-    () => metaDescription || extractExcerpt(htmlContent),
-    [metaDescription, htmlContent]
+    () => metaDescription || extractExcerpt(normalizedHtml),
+    [metaDescription, normalizedHtml]
   );
-  const processedHtml = useMemo(() => injectHeadingIds(htmlContent), [htmlContent]);
+  const processedHtml = useMemo(() => sanitizeHtml(injectHeadingIds(normalizedHtml)), [normalizedHtml]);
 
   const formattedDate = publishedAt
     ? new Date(publishedAt).toLocaleDateString("en-US", {
@@ -111,7 +213,9 @@ export default function ArticleTemplate({
     headline: title,
     description: excerpt,
     datePublished: publishedAt,
+    dateModified: publishedAt,
     url: `${brandUrl}/blog/${slug}`,
+    mainEntityOfPage: `${brandUrl}/blog/${slug}`,
     publisher: {
       "@type": "Organization",
       name: brand,
@@ -125,18 +229,67 @@ export default function ArticleTemplate({
     },
   };
 
+  const breadcrumbStructuredData = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: brandUrl },
+      { "@type": "ListItem", position: 2, name: "Blog", item: `${brandUrl}/blog` },
+      { "@type": "ListItem", position: 3, name: title, item: `${brandUrl}/blog/${slug}` },
+    ],
+  };
+
+  // Extract FAQ items from body markup using `faq-item` / `faq-question` / `faq-answer` classes
+  const faqStructuredData = useMemo(() => {
+    const items: { q: string; a: string }[] = [];
+    const re = /<div[^>]*class="[^"]*faq-item[^"]*"[^>]*>([\s\S]*?)<\/div>\s*(?=<div[^>]*class="[^"]*faq-item|<h2|<\/article|$)/gi;
+    let m;
+    while ((m = re.exec(normalizedHtml)) !== null) {
+      const block = m[1];
+      const qMatch = block.match(/<div[^>]*class="[^"]*faq-question[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+      const aMatch = block.match(/<div[^>]*class="[^"]*faq-answer[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+      if (qMatch && aMatch) {
+        items.push({
+          q: qMatch[1].replace(/<[^>]*>/g, "").trim(),
+          a: aMatch[1].replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim(),
+        });
+      }
+    }
+    if (!items.length) return null;
+    return {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: items.map((i) => ({
+        "@type": "Question",
+        name: i.q,
+        acceptedAnswer: { "@type": "Answer", text: i.a },
+      })),
+    };
+  }, [normalizedHtml]);
+
   return (
     <>
       <Helmet>
         <title>{title} | {brand}</title>
         <meta name="description" content={excerpt} />
+        <meta property="og:site_name" content={brand} />
         <meta property="og:title" content={title} />
         <meta property="og:description" content={excerpt} />
         <meta property="og:type" content="article" />
         <meta property="og:url" content={`${brandUrl}/blog/${slug}`} />
+        <meta property="og:image" content={`${brandUrl}/favicon.png`} />
+        {publishedAt && <meta property="article:published_time" content={publishedAt} />}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={title} />
+        <meta name="twitter:description" content={excerpt} />
+        <meta name="twitter:image" content={`${brandUrl}/favicon.png`} />
         <meta name="robots" content="index, follow" />
         <link rel="canonical" href={`${brandUrl}/blog/${slug}`} />
         <script type="application/ld+json">{JSON.stringify(articleStructuredData)}</script>
+        <script type="application/ld+json">{JSON.stringify(breadcrumbStructuredData)}</script>
+        {faqStructuredData && (
+          <script type="application/ld+json">{JSON.stringify(faqStructuredData)}</script>
+        )}
       </Helmet>
 
       <div className="min-h-screen bg-background">

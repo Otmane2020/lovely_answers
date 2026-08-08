@@ -44,8 +44,8 @@ serve(async (req) => {
       );
     }
 
-    const clientId = Deno.env.get("GOOGLE_CLIENT_ID");
-    const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET");
+    const clientId = Deno.env.get("GMB_GOOGLE_CLIENT_ID") || Deno.env.get("GOOGLE_CLIENT_ID");
+    const clientSecret = Deno.env.get("GMB_GOOGLE_CLIENT_SECRET") || Deno.env.get("GOOGLE_CLIENT_SECRET");
 
     if (!clientId || !clientSecret) {
       return new Response(
@@ -71,8 +71,8 @@ serve(async (req) => {
       const errorText = await tokenResponse.text();
       console.error("GMB token exchange error:", errorText);
       return new Response(
-        JSON.stringify({ error: "Failed to exchange code for tokens", details: errorText }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ success: false, error: "Failed to exchange code for tokens", details: errorText }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -107,13 +107,15 @@ serve(async (req) => {
           if (account) {
             accountName = account.accountName || account.name;
             const locationsRes = await fetch(
-              `https://mybusinessbusinessinformation.googleapis.com/v1/${account.name}/locations`,
+              `https://mybusinessbusinessinformation.googleapis.com/v1/${account.name}/locations?readMask=name,title&pageSize=10`,
               { headers: { Authorization: `Bearer ${tokenData.access_token}` } }
             );
             if (locationsRes.ok) {
               const locationsData = await locationsRes.json();
-              locationName = locationsData.locations?.[0]?.name || null;
+              const first = locationsData.locations?.[0];
+              locationName = first ? `${account.name}/${first.name}` : null;
             }
+
           }
         }
       } catch (e) {
@@ -178,8 +180,8 @@ serve(async (req) => {
     console.error("Error in gmb-oauth-token:", error);
     const message = error instanceof Error ? error.message : "Unknown error";
     return new Response(
-      JSON.stringify({ error: message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ success: false, error: message }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

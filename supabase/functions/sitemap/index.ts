@@ -17,12 +17,12 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey)
 
     // Helper: paginated fetch to bypass 1000-row limit
-    async function fetchAll(table: string, select: string, filters?: (q: any) => any) {
+    async function fetchAll(table: string, select: string, orderColumn: string, filters?: (q: any) => any) {
       const all: any[] = []
       let offset = 0
       const batchSize = 1000
       while (true) {
-        let query = supabase.from(table).select(select).order('published_at', { ascending: false }).range(offset, offset + batchSize - 1)
+        let query = supabase.from(table).select(select).order(orderColumn, { ascending: false }).range(offset, offset + batchSize - 1)
         if (filters) query = filters(query)
         const { data, error } = await query
         if (error) { console.error(`Error fetching ${table}:`, error); throw error }
@@ -39,16 +39,18 @@ Deno.serve(async (req) => {
     const answers = await fetchAll(
       'answers',
       'slug, published_at, updated_at, projects!inner(domain, website_url)',
+      'published_at',
       (q: any) => q.eq('is_public', true).not('published_at', 'is', null)
     )
 
     // 2. Fetch all published blog articles from published_articles
-    const publishedArticles = await fetchAll('published_articles', 'slug, published_at, updated_at')
+    const publishedArticles = await fetchAll('published_articles', 'slug, published_at, updated_at', 'published_at')
 
-    // 3. Fetch published articles from articles table
+    // 3. Fetch published articles from articles table (no published_at column)
     const directArticles = await fetchAll(
       'articles',
       'slug, created_at, updated_at, projects!inner(domain, website_url)',
+      'created_at',
       (q: any) => q.eq('status', 'published').not('slug', 'is', null)
     )
 

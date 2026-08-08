@@ -36,6 +36,7 @@ export function useGoogleBusiness() {
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (project?.id) {
@@ -91,16 +92,50 @@ export function useGoogleBusiness() {
     }
   };
 
+  const disconnectGMB = async () => {
+    if (!project?.id) return;
+    try {
+      const { error } = await supabase
+        .from("integrations")
+        .update({ is_connected: false, config: {} })
+        .eq("project_id", project.id)
+        .eq("platform", "google_business");
+
+      if (error) throw error;
+
+      setIsConnected(false);
+      setBusiness(null);
+      setLocations([]);
+      setSelectedLocationIds([]);
+      toast.success("Google My Business disconnected");
+    } catch (error) {
+      console.error("Error disconnecting GMB:", error);
+      toast.error("Failed to disconnect");
+    }
+  };
+
   const fetchBusiness = async () => {
     if (!project?.id) return;
     
     setIsLoading(true);
+    setError(null);
     try {
-      const { data, error } = await supabase.functions.invoke("gmb-fetch-business", {
+      const { data, error: fnError } = await supabase.functions.invoke("gmb-fetch-business", {
         body: { projectId: project.id },
       });
 
-      if (error) throw error;
+      if (fnError) throw fnError;
+      
+      if (data?.tokenExpired) {
+        setIsConnected(false);
+        setError(data.error || "Session expired. Please reconnect.");
+        toast.error("Google Business session expired. Please reconnect.");
+        return;
+      }
+      
+      if (data?.error && !data?.business) {
+        setError(data.error);
+      }
       
       if (data?.business) {
         setBusiness(data.business);
@@ -111,8 +146,9 @@ export function useGoogleBusiness() {
       if (data?.selectedLocationIds) {
         setSelectedLocationIds(data.selectedLocationIds);
       }
-    } catch (error) {
-      console.error("Error fetching business:", error);
+    } catch (err) {
+      console.error("Error fetching business:", err);
+      setError("Failed to load business data");
     } finally {
       setIsLoading(false);
     }
@@ -197,7 +233,9 @@ export function useGoogleBusiness() {
     isLoading,
     isConnected,
     isSaving,
+    error,
     connectGMB,
+    disconnectGMB,
     fetchBusiness,
     fetchInsights,
     publishPost,

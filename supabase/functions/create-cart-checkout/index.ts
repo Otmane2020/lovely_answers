@@ -68,12 +68,15 @@ serve(async (req) => {
       quantity: item.quantity,
     }));
 
-    // Create checkout session with promo codes enabled (no trial period)
+    // Create checkout session with 3-day trial and promo codes enabled
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : user.email,
       line_items: lineItems,
       mode: "subscription",
+      subscription_data: {
+        trial_period_days: 3,
+      },
       allow_promotion_codes: true,
       success_url: `${origin}/dashboard?subscription=success${cartId ? `&cartId=${cartId}` : ""}`,
       cancel_url: `${origin}/cart?subscription=canceled`,
