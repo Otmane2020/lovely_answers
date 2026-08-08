@@ -414,6 +414,28 @@ Deno.serve(async (req) => {
       formattedUrl = `https://${formattedUrl}`;
     }
 
+    // A malformed/incomplete domain (e.g. "https://clipmotion.") only fails
+    // later as an opaque DNS error — reject it up front with a clear message.
+    let hostname = '';
+    try {
+      const parsed = new URL(formattedUrl);
+      hostname = parsed.hostname.replace(/\.+$/, '');
+      parsed.hostname = hostname;
+      formattedUrl = parsed.href;
+    } catch {
+      hostname = '';
+    }
+    if (!/^([a-z0-9-]+\.)+[a-z]{2,}$/i.test(hostname)) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `Invalid website URL "${url}". Please enter a complete domain, e.g. https://clipmotion.ai`,
+          code: 'invalid_url',
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     console.log('[internal-scraper] Scraping:', formattedUrl);
     const startTime = Date.now();
 
