@@ -868,59 +868,6 @@ export type Database = {
         }
         Relationships: []
       }
-      content_topics: {
-        Row: {
-          angle: string | null
-          content_id: string | null
-          content_type: string
-          created_at: string
-          id: string
-          primary_keyword: string | null
-          project_id: string
-          scheduled_date: string | null
-          status: string
-          topic: string
-          topic_fingerprint: string
-          updated_at: string
-        }
-        Insert: {
-          angle?: string | null
-          content_id?: string | null
-          content_type: string
-          created_at?: string
-          id?: string
-          primary_keyword?: string | null
-          project_id: string
-          scheduled_date?: string | null
-          status?: string
-          topic: string
-          topic_fingerprint: string
-          updated_at?: string
-        }
-        Update: {
-          angle?: string | null
-          content_id?: string | null
-          content_type?: string
-          created_at?: string
-          id?: string
-          primary_keyword?: string | null
-          project_id?: string
-          scheduled_date?: string | null
-          status?: string
-          topic?: string
-          topic_fingerprint?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "content_topics_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       credits: {
         Row: {
           created_at: string | null
@@ -1654,56 +1601,38 @@ export type Database = {
       }
       keywords: {
         Row: {
-          cluster: string | null
-          cpc: number | null
           created_at: string | null
           difficulty: number | null
-          enriched_at: string | null
           id: string
           intent: string | null
-          is_question: boolean
           is_used: boolean | null
           keyword: string
           project_id: string
           search_volume: number | null
-          serp_domains: Json | null
-          source: string | null
           source_url: string | null
           updated_at: string | null
         }
         Insert: {
-          cluster?: string | null
-          cpc?: number | null
           created_at?: string | null
           difficulty?: number | null
-          enriched_at?: string | null
           id?: string
           intent?: string | null
-          is_question?: boolean
           is_used?: boolean | null
           keyword: string
           project_id: string
           search_volume?: number | null
-          serp_domains?: Json | null
-          source?: string | null
           source_url?: string | null
           updated_at?: string | null
         }
         Update: {
-          cluster?: string | null
-          cpc?: number | null
           created_at?: string | null
           difficulty?: number | null
-          enriched_at?: string | null
           id?: string
           intent?: string | null
-          is_question?: boolean
           is_used?: boolean | null
           keyword?: string
           project_id?: string
           search_volume?: number | null
-          serp_domains?: Json | null
-          source?: string | null
           source_url?: string | null
           updated_at?: string | null
         }
@@ -3106,50 +3035,6 @@ export type Database = {
         }
         Relationships: []
       }
-      project_context: {
-        Row: {
-          context: Json
-          context_version: number
-          created_at: string
-          id: string
-          project_id: string
-          readiness: string
-          refreshed_at: string | null
-          stale: boolean
-          updated_at: string
-        }
-        Insert: {
-          context?: Json
-          context_version?: number
-          created_at?: string
-          id?: string
-          project_id: string
-          readiness?: string
-          refreshed_at?: string | null
-          stale?: boolean
-          updated_at?: string
-        }
-        Update: {
-          context?: Json
-          context_version?: number
-          created_at?: string
-          id?: string
-          project_id?: string
-          readiness?: string
-          refreshed_at?: string | null
-          stale?: boolean
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "project_context_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: true
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       project_settings: {
         Row: {
           article_length: number | null
@@ -3270,9 +3155,7 @@ export type Database = {
           business_description: string | null
           business_type: string | null
           competitors: string[] | null
-          country: string | null
           created_at: string | null
-          detected_cms: string | null
           domain: string | null
           example_url: string | null
           id: string
@@ -3280,10 +3163,6 @@ export type Database = {
           language: string
           name: string
           needs_onboarding: boolean
-          onboarding_last_error: string | null
-          onboarding_progress: number
-          onboarding_status: string
-          onboarding_updated_at: string | null
           sitemap_url: string | null
           source: string | null
           updated_at: string | null
@@ -3299,9 +3178,7 @@ export type Database = {
           business_description?: string | null
           business_type?: string | null
           competitors?: string[] | null
-          country?: string | null
           created_at?: string | null
-          detected_cms?: string | null
           domain?: string | null
           example_url?: string | null
           id?: string
@@ -3309,10 +3186,6 @@ export type Database = {
           language?: string
           name: string
           needs_onboarding?: boolean
-          onboarding_last_error?: string | null
-          onboarding_progress?: number
-          onboarding_status?: string
-          onboarding_updated_at?: string | null
           sitemap_url?: string | null
           source?: string | null
           updated_at?: string | null
@@ -3328,9 +3201,7 @@ export type Database = {
           business_description?: string | null
           business_type?: string | null
           competitors?: string[] | null
-          country?: string | null
           created_at?: string | null
-          detected_cms?: string | null
           domain?: string | null
           example_url?: string | null
           id?: string
@@ -3338,10 +3209,6 @@ export type Database = {
           language?: string
           name?: string
           needs_onboarding?: boolean
-          onboarding_last_error?: string | null
-          onboarding_progress?: number
-          onboarding_status?: string
-          onboarding_updated_at?: string | null
           sitemap_url?: string | null
           source?: string | null
           updated_at?: string | null
@@ -3805,55 +3672,34 @@ export type Database = {
       }
       site_pages: {
         Row: {
-          content: string | null
           created_at: string
-          headings: Json | null
           id: string
-          lang: string | null
           last_crawled_at: string | null
           meta_description: string | null
-          normalized_url: string | null
-          page_type: string | null
           project_id: string
-          scraped_at: string | null
           title: string | null
           updated_at: string
           url: string
-          word_count: number | null
         }
         Insert: {
-          content?: string | null
           created_at?: string
-          headings?: Json | null
           id?: string
-          lang?: string | null
           last_crawled_at?: string | null
           meta_description?: string | null
-          normalized_url?: string | null
-          page_type?: string | null
           project_id: string
-          scraped_at?: string | null
           title?: string | null
           updated_at?: string
           url: string
-          word_count?: number | null
         }
         Update: {
-          content?: string | null
           created_at?: string
-          headings?: Json | null
           id?: string
-          lang?: string | null
           last_crawled_at?: string | null
           meta_description?: string | null
-          normalized_url?: string | null
-          page_type?: string | null
           project_id?: string
-          scraped_at?: string | null
           title?: string | null
           updated_at?: string
           url?: string
-          word_count?: number | null
         }
         Relationships: [
           {
