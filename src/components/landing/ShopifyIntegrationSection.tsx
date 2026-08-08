@@ -28,7 +28,7 @@ export function ShopifyIntegrationSection() {
   };
 
   return (
-    <section className="py-20 md:py-28 bg-gradient-to-b from-white to-[#f8f7f4]">
+    <section className="py-20 md:py-28 bg-gradient-to-b from-card to-secondary">
       <div className="container px-4">
         <motion.div
           initial={{ opacity: 0, y: 24 }}

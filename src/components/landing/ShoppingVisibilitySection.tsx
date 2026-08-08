@@ -3,7 +3,7 @@ import { ShoppingBag, Star, MessageSquare, Sparkles } from "lucide-react";
 
 export function ShoppingVisibilitySection() {
   return (
-    <section className="py-12 md:py-24 bg-[#f8f9fb] relative overflow-hidden">
+    <section className="py-12 md:py-24 bg-secondary relative overflow-hidden">
       <div className="container px-4 relative">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
