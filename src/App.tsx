@@ -5,7 +5,7 @@ import { ScrollToTop } from "@/components/ScrollToTop";
 import IndexPage from "@/views/Index";
 import AuthPage from "@/views/Auth";
 import SignupPage from "@/views/Signup";
-import Dashboard from "@/views/Dashboard";
+import Dashboard from "@/views/GEODashboard";
 import Pricing from "@/views/Pricing";
 import Blog from "@/views/Blog";
 import AeoSettings from "@/views/AeoSettings";
