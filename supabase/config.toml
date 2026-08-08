@@ -252,3 +252,8 @@ verify_jwt = false
 
 [functions.debug-shopping-status]
 verify_jwt = false
+
+[functions.rolling-30-day-planner]
+verify_jwt = false
+schedule = "10 * * * *"
+
