@@ -37,7 +37,7 @@ export function ShopifyIntegrationSection() {
           transition={{ duration: 0.5 }}
           className="mx-auto max-w-5xl"
         >
-          <div className="rounded-3xl border border-[#e8e6df] bg-white overflow-hidden shadow-[0_8px_40px_rgba(0,0,0,0.04)]">
+          <div className="rounded-3xl border border-[#e8e6df] bg-card overflow-hidden shadow-[0_8px_40px_rgba(0,0,0,0.04)]">
             <div className="grid md:grid-cols-2 gap-0">
               {/* Left: pitch */}
               <div className="p-8 md:p-12">
@@ -72,11 +72,11 @@ export function ShopifyIntegrationSection() {
 
               {/* Right: install box */}
               <div className="p-8 md:p-12 bg-gradient-to-br from-[#f5faf0] to-[#e8f4de] border-l border-[#e8e6df] flex flex-col justify-center">
-                <div className="rounded-2xl bg-white border border-[#d9e8c9] p-6 shadow-sm">
+                <div className="rounded-2xl bg-card border border-[#d9e8c9] p-6 shadow-sm">
                   <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                     Your Shopify store URL
                   </label>
-                  <div className="mt-2 flex items-center rounded-xl border border-border bg-white overflow-hidden focus-within:ring-2 focus-within:ring-[#96bf48]/40">
+                  <div className="mt-2 flex items-center rounded-xl border border-border bg-card overflow-hidden focus-within:ring-2 focus-within:ring-[#96bf48]/40">
                     <Input
                       value={shop}
                       onChange={(e) => setShop(e.target.value)}

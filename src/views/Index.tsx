@@ -253,7 +253,7 @@ export default function Index() {
 
 
         {/* NAV */}
-        <nav className="fixed top-0 z-50 w-full bg-white border-b border-border shadow-sm">
+        <nav className="fixed top-0 z-50 w-full bg-card border-b border-border shadow-sm">
 
 
           <div className="container flex h-16 items-center justify-between px-4">
@@ -292,12 +292,12 @@ export default function Index() {
         {/* HERO */}
         <section
           className="relative pt-40 md:pt-44 pb-20 md:pb-28 overflow-hidden"
-          style={{ background: "linear-gradient(180deg, #ffffff 0%, #f8f7f4 100%)" }}
+          style={{ background: "var(--gradient-subtle)" }}
         >
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
-              background: "radial-gradient(ellipse 80% 50% at 50% 0%, rgba(37,99,235,0.055) 0%, transparent 70%)",
+              background: "radial-gradient(ellipse 80% 50% at 50% 0%, hsla(232,51%,36%,0.08) 0%, transparent 70%)",
             }}
           />
           <div className="container relative px-4">
@@ -306,7 +306,7 @@ export default function Index() {
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4 }}
-                className="inline-flex items-center gap-2 bg-white border border-border rounded-full px-4 py-1.5 text-sm text-muted-foreground mb-7 shadow-sm"
+                className="inline-flex items-center gap-2 bg-card border border-border rounded-full px-4 py-1.5 text-sm text-muted-foreground mb-7 shadow-sm"
               >
                 <span className="w-2 h-2 rounded-full bg-green-500" style={{ animation: "pulse-dot 2s infinite" }} />
                 500+ businesses growing with AI search
@@ -356,7 +356,7 @@ export default function Index() {
                 <Button
                   size="lg"
                   variant="outline"
-                  className="px-8 border-border text-foreground/80 bg-white hover:bg-secondary text-base rounded-xl"
+                  className="px-8 border-border text-foreground/80 bg-card hover:bg-secondary text-base rounded-xl"
                   style={{ height: "52px" }}
                   onClick={() => {
                     const el = document.getElementById("features");
@@ -387,7 +387,7 @@ export default function Index() {
                 {socialProofPills.map((p, i) => (
                   <div
                     key={i}
-                    className="inline-flex items-center gap-2 bg-white border border-border rounded-full px-4 py-2 text-sm text-muted-foreground shadow-sm"
+                    className="inline-flex items-center gap-2 bg-card border border-border rounded-full px-4 py-2 text-sm text-muted-foreground shadow-sm"
                   >
                     <div
                       className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
@@ -410,7 +410,7 @@ export default function Index() {
                 transition={{ duration: 0.6, delay: 0.6 }}
                 className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl mx-auto mb-12"
               >
-                <div className="bg-white border border-border rounded-2xl p-5 text-left shadow-sm">
+                <div className="bg-card border border-border rounded-2xl p-5 text-left shadow-sm">
                   <p className="text-xs font-bold tracking-widest text-red-500 uppercase mb-4">
                     ✕ Without AutoPilot Geo
                   </p>
@@ -423,7 +423,7 @@ export default function Index() {
                     </div>
                   ))}
                 </div>
-                <div className="bg-white border border-blue-100 rounded-2xl p-5 text-left shadow-sm">
+                <div className="bg-card border border-border rounded-2xl p-5 text-left shadow-sm">
                   <p className="text-xs font-bold tracking-widest text-green-600 uppercase mb-4">
                     ✓ With AutoPilot Geo
                   </p>
@@ -446,7 +446,7 @@ export default function Index() {
                 className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-2xl mx-auto mb-12"
               >
                 {heroStats.map((stat, i) => (
-                  <div key={i} className="bg-white border border-border rounded-2xl px-4 py-4 text-center shadow-sm">
+                  <div key={i} className="bg-card border border-border rounded-2xl px-4 py-4 text-center shadow-sm">
                     <div className="text-2xl font-extrabold text-foreground leading-none">
                       {stat.value}
                       <span className="text-primary text-lg">{stat.suffix}</span>
@@ -463,7 +463,7 @@ export default function Index() {
                   {aiPlatforms.map((p) => (
                     <div
                       key={p.name}
-                      className="inline-flex items-center gap-2 bg-white border border-border rounded-full px-4 py-2 text-sm text-muted-foreground font-medium shadow-sm"
+                      className="inline-flex items-center gap-2 bg-card border border-border rounded-full px-4 py-2 text-sm text-muted-foreground font-medium shadow-sm"
                     >
                       <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.color }} />
                       {p.name}
@@ -477,7 +477,7 @@ export default function Index() {
         </section>
 
         {/* Product Demo Video */}
-        <section className="py-16 md:py-24 bg-white">
+        <section className="py-16 md:py-24 bg-card">
           <div className="container px-4 max-w-5xl">
             <div className="text-center mb-10">
               <span className="inline-block text-xs font-semibold uppercase tracking-widest text-primary mb-3">
@@ -550,7 +550,7 @@ export default function Index() {
 
             <div className="mt-8 text-center">
               <Link href="/checkout?plan=pro&cycle=annual">
-                <Button size="lg" className="bg-white text-foreground hover:bg-white/90 h-12 px-6">
+                <Button size="lg" className="bg-card text-foreground hover:bg-white/90 h-12 px-6">
                   Start free trial <ArrowRight className="ml-2 w-4 h-4" />
                 </Button>
               </Link>
@@ -564,7 +564,7 @@ export default function Index() {
 
 
         {/* AI Platform Logos */}
-        <section className="py-10 md:py-14 border-b border-border bg-white">
+        <section className="py-10 md:py-14 border-b border-border bg-card">
           <div className="container px-4">
             <p className="text-center text-sm text-muted-foreground mb-6 uppercase tracking-widest">
               Optimize your presence across all major AI platforms
@@ -573,7 +573,7 @@ export default function Index() {
               {aiPlatforms.map((platform) => (
                 <div
                   key={platform.name}
-                  className="inline-flex items-center gap-2 bg-white border border-border rounded-full px-5 py-2.5 shadow-sm"
+                  className="inline-flex items-center gap-2 bg-card border border-border rounded-full px-5 py-2.5 shadow-sm"
                 >
                   <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: platform.color }} />
                   <span className="text-sm font-semibold text-foreground/80">{platform.name}</span>
@@ -585,7 +585,7 @@ export default function Index() {
         </section>
 
         {/* Stats Section */}
-        <section className="py-16 md:py-24 bg-white">
+        <section className="py-16 md:py-24 bg-card">
           <div className="container px-4">
             <div className="text-center mb-12">
               <h2
@@ -648,7 +648,7 @@ export default function Index() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: i * 0.1 }}
-                  className="rounded-2xl border border-border bg-white p-6 hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
+                  className="rounded-2xl border border-border bg-card p-6 hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
                 >
                   <div className="h-12 w-12 rounded-xl bg-secondary flex items-center justify-center text-primary mb-4">
                     {card.icon}
@@ -695,7 +695,7 @@ export default function Index() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: i * 0.1 }}
-                  className="rounded-2xl overflow-hidden border border-border bg-white shadow-sm"
+                  className="rounded-2xl overflow-hidden border border-border bg-card shadow-sm"
                 >
                   <div className="h-40 bg-[hsl(var(--primary-deep))] p-5 flex items-end">
                     <div className="rounded-lg bg-white/10 p-3 w-full">
@@ -713,7 +713,7 @@ export default function Index() {
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-5xl mx-auto">
               {bottomFeatures.map((f, i) => (
-                <div key={i} className="rounded-xl border border-border bg-white p-5 text-center shadow-sm">
+                <div key={i} className="rounded-xl border border-border bg-card p-5 text-center shadow-sm">
                   <div className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center text-primary mx-auto mb-3">
                     {f.icon}
                   </div>
@@ -726,7 +726,7 @@ export default function Index() {
         </section>
 
         {/* FAQ */}
-        <section className="py-16 md:py-24 bg-white">
+        <section className="py-16 md:py-24 bg-card">
           <div className="container px-4">
             <div className="text-center mb-12">
               <h2 className="text-3xl md:text-4xl font-bold text-foreground" style={{ letterSpacing: "-0.02em" }}>
@@ -783,7 +783,7 @@ export default function Index() {
                 </p>
                 <Button
                   size="lg"
-                  className="px-8 bg-white text-foreground hover:bg-secondary text-base font-semibold gap-2 rounded-xl"
+                  className="px-8 bg-card text-foreground hover:bg-secondary text-base font-semibold gap-2 rounded-xl"
                   style={{ height: "52px" }}
                   asChild
                 >
@@ -827,7 +827,7 @@ export default function Index() {
             </p>
             <Button
               size="lg"
-              className="px-10 bg-white text-foreground hover:bg-secondary text-base font-semibold gap-2 rounded-xl shadow-lg"
+              className="px-10 bg-card text-foreground hover:bg-secondary text-base font-semibold gap-2 rounded-xl shadow-lg"
               style={{ height: "52px" }}
               asChild
             >
@@ -844,7 +844,7 @@ export default function Index() {
         <PublicFooter />
 
         {/* Sticky Mobile CTA */}
-        <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 p-3 bg-white border-t border-border shadow-2xl">
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 p-3 bg-card border-t border-border shadow-2xl">
           <Button
             className="w-full h-11 bg-[hsl(var(--primary-deep))] hover:bg-primary text-white font-semibold gap-2 rounded-xl"
             asChild

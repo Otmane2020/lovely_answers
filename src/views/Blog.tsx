@@ -113,7 +113,7 @@ export default function Blog() {
 
       <div className="min-h-screen">
         {/* Header - Dark */}
-        <header className="border-b border-border bg-white sticky top-0 z-50">
+        <header className="border-b border-border bg-card sticky top-0 z-50">
           <div className="container flex h-16 items-center justify-between">
             <Link href="/" className="flex items-center">
               <AnimatedLogo size="sm" />
@@ -154,7 +154,7 @@ export default function Blog() {
         </section>
 
         {/* Featured Guides */}
-        <section className="bg-white pt-12">
+        <section className="bg-card pt-12">
           <div className="container space-y-6">
             <div className="max-w-4xl mx-auto rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 to-white p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
@@ -201,7 +201,7 @@ export default function Blog() {
         </section>
 
         {/* Articles Grid - White */}
-        <section className="py-16 bg-white">
+        <section className="py-16 bg-card">
           <div className="container">
 
             {isLoading ? (
@@ -266,7 +266,7 @@ export default function Blog() {
               <h2 className="text-3xl font-bold mb-4 text-white">Want AI-Optimized Content for Your Business?</h2>
               <p className="text-white/80 mb-8">AutoPilot Geo helps you create content that ranks first in AI search engines.</p>
               <Link href="/auth">
-                <Button size="lg" className="gap-2 bg-white text-[hsl(222,47%,11%)] hover:bg-white/90">
+                <Button size="lg" className="gap-2 bg-card text-[hsl(222,47%,11%)] hover:bg-white/90">
                   Get Started Free <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>

@@ -129,7 +129,7 @@ export default function Signup() {
         <link rel="canonical" href="https://autopilotgeo.com/signup" />
         <meta name="robots" content="noindex,follow" />
       </Helmet>
-    <div className="min-h-screen bg-white flex">
+    <div className="min-h-screen bg-card flex">
       {/* Left Panel */}
       <div className="flex-1 flex flex-col justify-center px-8 py-12 lg:px-16">
         <div className="w-full max-w-md mx-auto">
@@ -158,7 +158,7 @@ export default function Signup() {
 
             <div className="relative">
               <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
-              <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-muted-foreground">Or</span></div>
+              <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">Or</span></div>
             </div>
 
             <form onSubmit={handleSignUp} className="space-y-4">

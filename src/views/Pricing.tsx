@@ -71,7 +71,7 @@ export default function Pricing() {
         <script type="application/ld+json">{JSON.stringify(faqStructuredData)}</script>
       </Helmet>
 
-      <div className="min-h-screen bg-white text-foreground">
+      <div className="min-h-screen bg-card text-foreground">
         <nav className="fixed top-0 z-50 w-full border-b border-border bg-white/90 backdrop-blur-xl">
           <div className="container flex h-16 items-center justify-between">
             <Link href="/" className="flex items-center"><AnimatedLogo size="md" /></Link>
@@ -86,14 +86,14 @@ export default function Pricing() {
         </nav>
 
         {/* HERO */}
-        <section className="relative overflow-hidden pt-32 pb-12" style={{ background: "linear-gradient(180deg, #ffffff 0%, #f8f7f4 100%)" }}>
+        <section className="relative overflow-hidden pt-32 pb-12" style={{ background: "var(--gradient-subtle)" }}>
           <div
             className="absolute inset-0 pointer-events-none"
             style={{ background: "radial-gradient(ellipse 80% 50% at 50% 0%, rgba(37,99,235,0.06) 0%, transparent 70%)" }}
           />
           <div className="container relative">
             <div className="mx-auto max-w-3xl text-center">
-              <Badge className="mb-6 bg-secondary text-blue-700 border-blue-100 hover:bg-secondary">3-day free trial · Card required · Cancel anytime</Badge>
+              <Badge className="mb-6 bg-secondary text-blue-700 border-border hover:bg-secondary">3-day free trial · Card required · Cancel anytime</Badge>
               <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl text-foreground" style={{ letterSpacing: "-0.02em" }}>
                 Get cited by <span className="text-primary">ChatGPT</span> in 30 days
               </h1>
@@ -102,7 +102,7 @@ export default function Pricing() {
               </p>
 
               {/* Billing toggle */}
-              <div className="mt-10 inline-flex items-center gap-1 rounded-full border border-border bg-white p-1 shadow-sm">
+              <div className="mt-10 inline-flex items-center gap-1 rounded-full border border-border bg-card p-1 shadow-sm">
                 <button
                   onClick={() => setCycle("monthly")}
                   className={cn(
@@ -134,7 +134,7 @@ export default function Pricing() {
                   <div
                     key={plan.id}
                     className={cn(
-                      "relative rounded-2xl border p-7 flex flex-col bg-white transition-all",
+                      "relative rounded-2xl border p-7 flex flex-col bg-card transition-all",
                       isPopular
                         ? "border-blue-300 shadow-2xl shadow-blue-500/10 md:scale-[1.03] ring-1 ring-blue-200"
                         : "border-border shadow-sm hover:border-border hover:shadow-md"
@@ -199,7 +199,7 @@ export default function Pricing() {
 
 
         {/* FAQ */}
-        <section className="py-20 bg-white">
+        <section className="py-20 bg-card">
           <div className="container max-w-3xl">
             <div className="text-center mb-12">
               <h2 className="text-3xl font-bold mb-4 text-[hsl(222,47%,11%)]">FAQs</h2>

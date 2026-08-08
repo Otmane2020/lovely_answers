@@ -59,7 +59,7 @@ export default function About() {
         </section>
 
         {/* Mission - White */}
-        <section className="py-20 bg-white">
+        <section className="py-20 bg-card">
           <div className="container max-w-4xl">
             <div className="grid gap-8 md:grid-cols-3">
               {[
@@ -96,14 +96,14 @@ export default function About() {
           <div className="container max-w-2xl text-center">
             <h2 className="text-3xl font-bold mb-4 text-white">Ready to Get Started?</h2>
             <p className="text-white/50 mb-8">Join 500+ businesses already using AutoPilot Geo to dominate AI search.</p>
-            <Button className="gap-2 bg-white text-[hsl(222,47%,11%)] hover:bg-white/90" size="lg" asChild>
+            <Button className="gap-2 bg-card text-[hsl(222,47%,11%)] hover:bg-white/90" size="lg" asChild>
               <Link href="/auth">Start Free Trial <ArrowRight className="h-5 w-5" /></Link>
             </Button>
           </div>
         </section>
 
         {/* Company Info */}
-        <section className="py-20 bg-white">
+        <section className="py-20 bg-card">
           <div className="container max-w-3xl text-center">
             <h2 className="text-2xl font-bold mb-6 text-[hsl(222,47%,11%)]">Company Information</h2>
             <div className="text-muted-foreground">

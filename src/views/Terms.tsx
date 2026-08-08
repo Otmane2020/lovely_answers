@@ -37,7 +37,7 @@ export default function Terms() {
         </div>
 
         {/* Content */}
-        <main className="bg-white py-16">
+        <main className="bg-card py-16">
           <div className="container max-w-3xl">
             <div className="space-y-8 text-muted-foreground">
               <section className="space-y-3">
