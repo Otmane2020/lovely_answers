@@ -72,6 +72,30 @@ async function callAIWithFallback(messages: any[], opts: { temperature?: number;
     }
   }
 
+  // Last resort: Lovable AI Gateway. The OpenRouter free tier is often 402/429,
+  // which used to abort the whole planner and made the dashboard spin forever.
+  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+  if (lovableKey) {
+    for (const model of ["google/gemini-2.5-flash", "google/gemini-2.5-flash-lite"]) {
+      try {
+        const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + lovableKey },
+          body: JSON.stringify({ model, messages, temperature, max_tokens }),
+        });
+        const data = await r.json().catch(() => ({}));
+        const content = data?.choices?.[0]?.message?.content || "";
+        if (r.ok && content) {
+          console.log("[AI fallback] Lovable AI success with", model);
+          return { content, status: r.status };
+        }
+        console.log("[AI fallback] Lovable AI", model, "failed:", r.status);
+      } catch (e) {
+        console.log("[AI fallback] Lovable AI", model, "threw:", String(e));
+      }
+    }
+  }
+
   return { content: "", status: 402, error: "All OpenRouter free models exhausted" };
 }
 
