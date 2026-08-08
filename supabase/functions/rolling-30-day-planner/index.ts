@@ -82,7 +82,11 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    if (token !== serviceRoleKey) {
+    // pg_cron posts with the project anon key (same convention as the other
+    // scheduled functions here), which auth.getUser() cannot resolve.
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    const isInternal = token === serviceRoleKey || (!!anonKey && token === anonKey);
+    if (!isInternal) {
       const { data: { user }, error } = await supabase.auth.getUser(token);
       if (error || !user) {
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
