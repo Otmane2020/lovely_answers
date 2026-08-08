@@ -39,7 +39,7 @@ export default function Terms() {
         {/* Content */}
         <main className="bg-white py-16">
           <div className="container max-w-3xl">
-            <div className="space-y-8 text-gray-500">
+            <div className="space-y-8 text-muted-foreground">
               <section className="space-y-3">
                 <h2 className="text-2xl font-semibold text-[hsl(222,47%,11%)]">1. Agreement to Terms</h2>
                 <p>By accessing or using AutoPilot Geo's services, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our services.</p>

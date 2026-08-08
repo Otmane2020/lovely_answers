@@ -39,7 +39,7 @@ export default function Privacy() {
         {/* Content */}
         <main className="bg-white py-16">
           <div className="container max-w-3xl">
-            <div className="space-y-8 text-gray-500">
+            <div className="space-y-8 text-muted-foreground">
               <section className="space-y-3">
                 <h2 className="text-2xl font-semibold text-[hsl(222,47%,11%)]">1. Information We Collect</h2>
                 <p>We collect information you provide directly to us, including:</p>
