@@ -253,7 +253,7 @@ export default function Index() {
 
 
         {/* NAV */}
-        <nav className="fixed top-0 z-50 w-full bg-white border-b border-gray-100 shadow-sm">
+        <nav className="fixed top-0 z-50 w-full bg-card border-b border-border shadow-sm">
 
 
           <div className="container flex h-16 items-center justify-between px-4">
@@ -261,27 +261,27 @@ export default function Index() {
               <AnimatedLogo size="md" />
             </Link>
             <div className="hidden md:flex items-center gap-1">
-              <Button variant="ghost" className="text-gray-600 hover:text-gray-900" asChild>
+              <Button variant="ghost" className="text-muted-foreground hover:text-foreground" asChild>
                 <Link href="/pricing">Pricing</Link>
               </Button>
-              <Button variant="ghost" className="text-gray-600 hover:text-gray-900" asChild>
+              <Button variant="ghost" className="text-muted-foreground hover:text-foreground" asChild>
                 <Link href="/blog">Blog</Link>
               </Button>
-              <Button variant="ghost" className="text-gray-600 hover:text-gray-900" asChild>
+              <Button variant="ghost" className="text-muted-foreground hover:text-foreground" asChild>
                 <Link href="/auth">Log in</Link>
               </Button>
               <Button variant="outline" className="ml-1 rounded-xl" asChild>
                 <Link href="/dashboard">Open App</Link>
               </Button>
-              <Button className="ml-2 bg-gray-900 text-white hover:bg-gray-800 rounded-xl px-5" asChild>
+              <Button className="ml-2 bg-[hsl(var(--primary-deep))] text-white hover:bg-primary rounded-xl px-5" asChild>
                 <Link href="/checkout?plan=pro&cycle=annual">Start free trial →</Link>
               </Button>
             </div>
             <div className="flex md:hidden items-center gap-2">
-              <Button variant="ghost" size="sm" className="text-gray-600" asChild>
+              <Button variant="ghost" size="sm" className="text-muted-foreground" asChild>
                 <Link href="/dashboard">App</Link>
               </Button>
-              <Button size="sm" className="bg-gray-900 text-white hover:bg-gray-800 rounded-lg" asChild>
+              <Button size="sm" className="bg-[hsl(var(--primary-deep))] text-white hover:bg-primary rounded-lg" asChild>
                 <Link href="/checkout?plan=pro&cycle=annual">Start Free</Link>
               </Button>
             </div>
@@ -292,12 +292,12 @@ export default function Index() {
         {/* HERO */}
         <section
           className="relative pt-40 md:pt-44 pb-20 md:pb-28 overflow-hidden"
-          style={{ background: "linear-gradient(180deg, #ffffff 0%, #f8f7f4 100%)" }}
+          style={{ background: "var(--gradient-subtle)" }}
         >
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
-              background: "radial-gradient(ellipse 80% 50% at 50% 0%, rgba(37,99,235,0.055) 0%, transparent 70%)",
+              background: "radial-gradient(ellipse 80% 50% at 50% 0%, hsla(232,51%,36%,0.08) 0%, transparent 70%)",
             }}
           />
           <div className="container relative px-4">
@@ -306,19 +306,19 @@ export default function Index() {
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4 }}
-                className="inline-flex items-center gap-2 bg-white border border-gray-200 rounded-full px-4 py-1.5 text-sm text-gray-600 mb-7 shadow-sm"
+                className="inline-flex items-center gap-2 bg-card border border-border rounded-full px-4 py-1.5 text-sm text-muted-foreground mb-7 shadow-sm"
               >
                 <span className="w-2 h-2 rounded-full bg-green-500" style={{ animation: "pulse-dot 2s infinite" }} />
                 500+ businesses growing with AI search
               </motion.div>
 
               <h1
-                className="text-5xl sm:text-6xl md:text-7xl font-extrabold tracking-tight text-gray-900 mb-5 leading-[1.08]"
+                className="text-5xl sm:text-6xl md:text-7xl font-extrabold tracking-tight text-foreground mb-5 leading-[1.08]"
                 style={{ letterSpacing: "-0.03em" }}
               >
                 The #1 GEO platform.
                 <br />
-                <span className="text-blue-600">Grow your Traffic ..</span>
+                <span className="text-primary">Grow your Traffic ..</span>
                 <br />
                 Win generative search.
               </h1>
@@ -327,10 +327,10 @@ export default function Index() {
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.2 }}
-                className="text-lg md:text-xl text-gray-700 max-w-xl mx-auto mb-9 leading-relaxed"
+                className="text-lg md:text-xl text-foreground/80 max-w-xl mx-auto mb-9 leading-relaxed"
               >
                 AutoPilot GEO is the first platform built purely for{" "}
-                <span className="font-semibold text-gray-700">Generative Engine Optimization</span>. We create, optimize and
+                <span className="font-semibold text-foreground/80">Generative Engine Optimization</span>. We create, optimize and
                 publish content that ChatGPT, Gemini, Perplexity and Google AI Overviews cite —
                 so customers find you when they ask AI.
               </motion.p>
@@ -344,7 +344,7 @@ export default function Index() {
               >
                 <Button
                   size="lg"
-                  className="px-8 bg-gray-900 text-white hover:bg-gray-800 text-base font-semibold gap-2 rounded-xl shadow-lg"
+                  className="px-8 bg-[hsl(var(--primary-deep))] text-white hover:bg-primary text-base font-semibold gap-2 rounded-xl shadow-lg"
                   style={{ height: "52px" }}
                   asChild
                 >
@@ -356,7 +356,7 @@ export default function Index() {
                 <Button
                   size="lg"
                   variant="outline"
-                  className="px-8 border-gray-200 text-gray-700 bg-white hover:bg-gray-50 text-base rounded-xl"
+                  className="px-8 border-border text-foreground/80 bg-card hover:bg-secondary text-base rounded-xl"
                   style={{ height: "52px" }}
                   onClick={() => {
                     const el = document.getElementById("features");
@@ -371,9 +371,9 @@ export default function Index() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.45 }}
-                className="text-sm text-gray-600 mb-12"
+                className="text-sm text-muted-foreground mb-12"
               >
-                3-day free trial · <span className="text-gray-600 font-medium">Card required</span> · Cancel anytime
+                3-day free trial · <span className="text-muted-foreground font-medium">Card required</span> · Cancel anytime
               </motion.p>
 
 
@@ -387,7 +387,7 @@ export default function Index() {
                 {socialProofPills.map((p, i) => (
                   <div
                     key={i}
-                    className="inline-flex items-center gap-2 bg-white border border-gray-100 rounded-full px-4 py-2 text-sm text-gray-600 shadow-sm"
+                    className="inline-flex items-center gap-2 bg-card border border-border rounded-full px-4 py-2 text-sm text-muted-foreground shadow-sm"
                   >
                     <div
                       className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
@@ -398,7 +398,7 @@ export default function Index() {
                     <span>
                       {p.name} · {p.role} ·
                     </span>
-                    <span className="font-semibold text-gray-900">{p.result}</span>
+                    <span className="font-semibold text-foreground">{p.result}</span>
                   </div>
                 ))}
               </motion.div>
@@ -410,7 +410,7 @@ export default function Index() {
                 transition={{ duration: 0.6, delay: 0.6 }}
                 className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl mx-auto mb-12"
               >
-                <div className="bg-white border border-gray-100 rounded-2xl p-5 text-left shadow-sm">
+                <div className="bg-card border border-border rounded-2xl p-5 text-left shadow-sm">
                   <p className="text-xs font-bold tracking-widest text-red-500 uppercase mb-4">
                     ✕ Without AutoPilot Geo
                   </p>
@@ -419,11 +419,11 @@ export default function Index() {
                       <div className="w-5 h-5 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0 mt-0.5">
                         <X className="h-3 w-3 text-red-500" />
                       </div>
-                      <span className="text-sm text-gray-700 leading-snug">{item}</span>
+                      <span className="text-sm text-foreground/80 leading-snug">{item}</span>
                     </div>
                   ))}
                 </div>
-                <div className="bg-white border border-blue-100 rounded-2xl p-5 text-left shadow-sm">
+                <div className="bg-card border border-border rounded-2xl p-5 text-left shadow-sm">
                   <p className="text-xs font-bold tracking-widest text-green-600 uppercase mb-4">
                     ✓ With AutoPilot Geo
                   </p>
@@ -432,7 +432,7 @@ export default function Index() {
                       <div className="w-5 h-5 rounded-full bg-green-50 flex items-center justify-center flex-shrink-0 mt-0.5">
                         <Check className="h-3 w-3 text-green-600" />
                       </div>
-                      <span className="text-sm text-gray-700 leading-snug font-medium">{item}</span>
+                      <span className="text-sm text-foreground/80 leading-snug font-medium">{item}</span>
                     </div>
                   ))}
                 </div>
@@ -446,24 +446,24 @@ export default function Index() {
                 className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-2xl mx-auto mb-12"
               >
                 {heroStats.map((stat, i) => (
-                  <div key={i} className="bg-white border border-gray-100 rounded-2xl px-4 py-4 text-center shadow-sm">
-                    <div className="text-2xl font-extrabold text-gray-900 leading-none">
+                  <div key={i} className="bg-card border border-border rounded-2xl px-4 py-4 text-center shadow-sm">
+                    <div className="text-2xl font-extrabold text-foreground leading-none">
                       {stat.value}
-                      <span className="text-blue-500 text-lg">{stat.suffix}</span>
+                      <span className="text-primary text-lg">{stat.suffix}</span>
                     </div>
-                    <p className="text-xs text-gray-600 mt-1.5">{stat.label}</p>
+                    <p className="text-xs text-muted-foreground mt-1.5">{stat.label}</p>
                   </div>
                 ))}
               </motion.div>
 
               {/* Platform pills */}
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }}>
-                <p className="text-xs text-gray-600 uppercase tracking-widest mb-3">Optimizes your presence on</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-widest mb-3">Optimizes your presence on</p>
                 <div className="flex flex-wrap gap-2 justify-center">
                   {aiPlatforms.map((p) => (
                     <div
                       key={p.name}
-                      className="inline-flex items-center gap-2 bg-white border border-gray-100 rounded-full px-4 py-2 text-sm text-gray-600 font-medium shadow-sm"
+                      className="inline-flex items-center gap-2 bg-card border border-border rounded-full px-4 py-2 text-sm text-muted-foreground font-medium shadow-sm"
                     >
                       <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.color }} />
                       {p.name}
@@ -477,20 +477,20 @@ export default function Index() {
         </section>
 
         {/* Product Demo Video */}
-        <section className="py-16 md:py-24 bg-white">
+        <section className="py-16 md:py-24 bg-card">
           <div className="container px-4 max-w-5xl">
             <div className="text-center mb-10">
-              <span className="inline-block text-xs font-semibold uppercase tracking-widest text-indigo-600 mb-3">
+              <span className="inline-block text-xs font-semibold uppercase tracking-widest text-primary mb-3">
                 GEO Engine demo
               </span>
-              <h2 className="text-3xl md:text-5xl font-bold tracking-tight text-gray-900 mb-4" style={{ letterSpacing: "-0.02em" }}>
+              <h2 className="text-3xl md:text-5xl font-bold tracking-tight text-foreground mb-4" style={{ letterSpacing: "-0.02em" }}>
                 See the GEO Engine in action
               </h2>
-              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
                 One platform optimizes your brand for generative AI — across ChatGPT, Gemini, Perplexity, Google AI Overviews and Shopping.
               </p>
             </div>
-            <div className="rounded-2xl overflow-hidden shadow-2xl border border-gray-100 bg-black">
+            <div className="rounded-2xl overflow-hidden shadow-2xl border border-border bg-black">
               <video
                 src={demoVideo.url}
                 controls
@@ -550,7 +550,7 @@ export default function Index() {
 
             <div className="mt-8 text-center">
               <Link href="/checkout?plan=pro&cycle=annual">
-                <Button size="lg" className="bg-white text-gray-900 hover:bg-white/90 h-12 px-6">
+                <Button size="lg" className="bg-card text-foreground hover:bg-white/90 h-12 px-6">
                   Start free trial <ArrowRight className="ml-2 w-4 h-4" />
                 </Button>
               </Link>
@@ -564,19 +564,19 @@ export default function Index() {
 
 
         {/* AI Platform Logos */}
-        <section className="py-10 md:py-14 border-b border-gray-100 bg-white">
+        <section className="py-10 md:py-14 border-b border-border bg-card">
           <div className="container px-4">
-            <p className="text-center text-sm text-gray-600 mb-6 uppercase tracking-widest">
+            <p className="text-center text-sm text-muted-foreground mb-6 uppercase tracking-widest">
               Optimize your presence across all major AI platforms
             </p>
             <div className="flex flex-wrap items-center justify-center gap-3 md:gap-4">
               {aiPlatforms.map((platform) => (
                 <div
                   key={platform.name}
-                  className="inline-flex items-center gap-2 bg-white border border-gray-100 rounded-full px-5 py-2.5 shadow-sm"
+                  className="inline-flex items-center gap-2 bg-card border border-border rounded-full px-5 py-2.5 shadow-sm"
                 >
                   <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: platform.color }} />
-                  <span className="text-sm font-semibold text-gray-700">{platform.name}</span>
+                  <span className="text-sm font-semibold text-foreground/80">{platform.name}</span>
                 </div>
               ))}
             </div>
@@ -585,16 +585,16 @@ export default function Index() {
         </section>
 
         {/* Stats Section */}
-        <section className="py-16 md:py-24 bg-white">
+        <section className="py-16 md:py-24 bg-card">
           <div className="container px-4">
             <div className="text-center mb-12">
               <h2
-                className="text-3xl md:text-5xl font-bold tracking-tight text-gray-900 mb-4"
+                className="text-3xl md:text-5xl font-bold tracking-tight text-foreground mb-4"
                 style={{ letterSpacing: "-0.02em" }}
               >
-                Generative search is the <span className="text-blue-600 font-extrabold">new growth channel</span>
+                Generative search is the <span className="text-primary font-extrabold">new growth channel</span>
               </h2>
-              <p className="text-gray-700 text-lg max-w-xl mx-auto">
+              <p className="text-foreground/80 text-lg max-w-xl mx-auto">
                 Businesses cited by AI engines get more trust, more clicks, more customers. GEO is how you get there.
               </p>
             </div>
@@ -611,15 +611,15 @@ export default function Index() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: i * 0.1 }}
-                  className="text-center bg-gray-50 rounded-2xl p-6 border border-gray-100"
+                  className="text-center bg-secondary rounded-2xl p-6 border border-border"
                 >
                   <div
-                    className="text-4xl md:text-5xl font-extrabold text-gray-900"
+                    className="text-4xl md:text-5xl font-extrabold text-foreground"
                     style={{ letterSpacing: "-0.03em" }}
                   >
                     {stat.value}
                   </div>
-                  <p className="text-sm text-gray-700 mt-2">{stat.label}</p>
+                  <p className="text-sm text-foreground/80 mt-2">{stat.label}</p>
                 </motion.div>
               ))}
             </div>
@@ -631,12 +631,12 @@ export default function Index() {
           <div className="container px-4">
             <div className="text-center mb-12">
               <h2
-                className="text-3xl md:text-5xl font-bold tracking-tight text-gray-900 mb-4"
+                className="text-3xl md:text-5xl font-bold tracking-tight text-foreground mb-4"
                 style={{ letterSpacing: "-0.02em" }}
               >
-                Understand how generative AI talks about <span className="text-blue-600 font-extrabold">your brand</span>
+                Understand how generative AI talks about <span className="text-primary font-extrabold">your brand</span>
               </h2>
-              <p className="text-gray-700 text-lg max-w-2xl mx-auto">
+              <p className="text-foreground/80 text-lg max-w-2xl mx-auto">
                 Monitor and optimize your brand's presence across every major generative AI engine.
               </p>
             </div>
@@ -648,14 +648,14 @@ export default function Index() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: i * 0.1 }}
-                  className="rounded-2xl border border-gray-100 bg-white p-6 hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
+                  className="rounded-2xl border border-border bg-card p-6 hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
                 >
-                  <div className="h-12 w-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 mb-4">
+                  <div className="h-12 w-12 rounded-xl bg-secondary flex items-center justify-center text-primary mb-4">
                     {card.icon}
                   </div>
-                  <h3 className="font-semibold text-lg text-gray-900 mb-2">{card.title}</h3>
-                  <p className="text-sm text-gray-700 leading-relaxed">{card.description}</p>
-                  <div className="mt-4 rounded-xl bg-gray-50 border border-gray-100 p-3 h-28 flex items-end gap-1">
+                  <h3 className="font-semibold text-lg text-foreground mb-2">{card.title}</h3>
+                  <p className="text-sm text-foreground/80 leading-relaxed">{card.description}</p>
+                  <div className="mt-4 rounded-xl bg-secondary border border-border p-3 h-28 flex items-end gap-1">
                     {Array.from({ length: 8 }).map((_, j) => (
                       <div
                         key={j}
@@ -678,12 +678,12 @@ export default function Index() {
           <div className="container px-4">
             <div className="text-center mb-12">
               <h2
-                className="text-3xl md:text-5xl font-bold tracking-tight text-gray-900 mb-4"
+                className="text-3xl md:text-5xl font-bold tracking-tight text-foreground mb-4"
                 style={{ letterSpacing: "-0.02em" }}
               >
-                Turn generative AI into a <span className="text-blue-600 font-extrabold">growth channel</span>
+                Turn generative AI into a <span className="text-primary font-extrabold">growth channel</span>
               </h2>
-              <p className="text-gray-700 text-lg max-w-2xl mx-auto">
+              <p className="text-foreground/80 text-lg max-w-2xl mx-auto">
                 Track, optimize, and grow your citations in AI-powered search results.
               </p>
             </div>
@@ -695,30 +695,30 @@ export default function Index() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: i * 0.1 }}
-                  className="rounded-2xl overflow-hidden border border-gray-100 bg-white shadow-sm"
+                  className="rounded-2xl overflow-hidden border border-border bg-card shadow-sm"
                 >
-                  <div className="h-40 bg-gray-900 p-5 flex items-end">
+                  <div className="h-40 bg-[hsl(var(--primary-deep))] p-5 flex items-end">
                     <div className="rounded-lg bg-white/10 p-3 w-full">
                       <div className="h-2 bg-white/25 rounded w-3/4 mb-1.5" />
                       <div className="h-2 bg-white/10 rounded w-1/2" />
                     </div>
                   </div>
                   <div className="p-5">
-                    <span className="text-[10px] font-bold tracking-widest text-blue-500 uppercase">{feature.tag}</span>
-                    <h3 className="font-semibold text-gray-900 mt-1 mb-2">{feature.title}</h3>
-                    <p className="text-sm text-gray-700">{feature.description}</p>
+                    <span className="text-[10px] font-bold tracking-widest text-primary uppercase">{feature.tag}</span>
+                    <h3 className="font-semibold text-foreground mt-1 mb-2">{feature.title}</h3>
+                    <p className="text-sm text-foreground/80">{feature.description}</p>
                   </div>
                 </motion.div>
               ))}
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-5xl mx-auto">
               {bottomFeatures.map((f, i) => (
-                <div key={i} className="rounded-xl border border-gray-100 bg-white p-5 text-center shadow-sm">
-                  <div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 mx-auto mb-3">
+                <div key={i} className="rounded-xl border border-border bg-card p-5 text-center shadow-sm">
+                  <div className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center text-primary mx-auto mb-3">
                     {f.icon}
                   </div>
-                  <h4 className="font-semibold text-sm text-gray-900 mb-1">{f.title}</h4>
-                  <p className="text-xs text-gray-600">{f.description}</p>
+                  <h4 className="font-semibold text-sm text-foreground mb-1">{f.title}</h4>
+                  <p className="text-xs text-muted-foreground">{f.description}</p>
                 </div>
               ))}
             </div>
@@ -726,10 +726,10 @@ export default function Index() {
         </section>
 
         {/* FAQ */}
-        <section className="py-16 md:py-24 bg-white">
+        <section className="py-16 md:py-24 bg-card">
           <div className="container px-4">
             <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold text-gray-900" style={{ letterSpacing: "-0.02em" }}>
+              <h2 className="text-3xl md:text-4xl font-bold text-foreground" style={{ letterSpacing: "-0.02em" }}>
                 Frequently Asked Questions
               </h2>
             </div>
@@ -739,16 +739,16 @@ export default function Index() {
                   <AccordionItem
                     key={i}
                     value={`faq-${i}`}
-                    className="rounded-xl border border-gray-100 bg-gray-50 px-5 transition-all hover:border-gray-200"
+                    className="rounded-xl border border-border bg-secondary px-5 transition-all hover:border-border"
                   >
-                    <AccordionTrigger className="text-left font-medium text-gray-900 py-4 hover:no-underline text-sm md:text-base">
+                    <AccordionTrigger className="text-left font-medium text-foreground py-4 hover:no-underline text-sm md:text-base">
                       {faq.question}
                     </AccordionTrigger>
-                    <AccordionContent className="text-gray-700 text-sm pb-4">{faq.answer}</AccordionContent>
+                    <AccordionContent className="text-foreground/80 text-sm pb-4">{faq.answer}</AccordionContent>
                   </AccordionItem>
                 ))}
               </Accordion>
-              <p className="text-center text-sm text-gray-700 mt-8">
+              <p className="text-center text-sm text-foreground/80 mt-8">
                 New to the space?{" "}
                 <Link
                   href="/blog/aeo-vs-geo"
@@ -764,7 +764,7 @@ export default function Index() {
 
 
         {/* Dark CTA */}
-        <section className="relative overflow-hidden bg-gray-900 py-20 md:py-32">
+        <section className="relative overflow-hidden bg-[hsl(var(--primary-deep))] py-20 md:py-32">
           <div
             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full pointer-events-none"
             style={{ background: "radial-gradient(circle, rgba(59,130,246,0.12) 0%, transparent 70%)" }}
@@ -783,7 +783,7 @@ export default function Index() {
                 </p>
                 <Button
                   size="lg"
-                  className="px-8 bg-white text-gray-900 hover:bg-gray-100 text-base font-semibold gap-2 rounded-xl"
+                  className="px-8 bg-card text-foreground hover:bg-secondary text-base font-semibold gap-2 rounded-xl"
                   style={{ height: "52px" }}
                   asChild
                 >
@@ -817,7 +817,7 @@ export default function Index() {
         </section>
 
         {/* Final CTA */}
-        <section className="bg-gray-900 py-14 md:py-20 border-t border-white/5">
+        <section className="bg-[hsl(var(--primary-deep))] py-14 md:py-20 border-t border-white/5">
           <div className="container px-4 text-center">
             <h2 className="text-2xl md:text-4xl font-bold text-white mb-4" style={{ letterSpacing: "-0.02em" }}>
               Own generative search.
@@ -827,7 +827,7 @@ export default function Index() {
             </p>
             <Button
               size="lg"
-              className="px-10 bg-white text-gray-900 hover:bg-gray-100 text-base font-semibold gap-2 rounded-xl shadow-lg"
+              className="px-10 bg-card text-foreground hover:bg-secondary text-base font-semibold gap-2 rounded-xl shadow-lg"
               style={{ height: "52px" }}
               asChild
             >
@@ -844,9 +844,9 @@ export default function Index() {
         <PublicFooter />
 
         {/* Sticky Mobile CTA */}
-        <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 p-3 bg-white border-t border-gray-100 shadow-2xl">
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 p-3 bg-card border-t border-border shadow-2xl">
           <Button
-            className="w-full h-11 bg-gray-900 hover:bg-gray-800 text-white font-semibold gap-2 rounded-xl"
+            className="w-full h-11 bg-[hsl(var(--primary-deep))] hover:bg-primary text-white font-semibold gap-2 rounded-xl"
             asChild
           >
             <Link href="/checkout?plan=pro&cycle=annual">

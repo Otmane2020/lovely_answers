@@ -3,7 +3,7 @@ import { ShoppingBag, Star, MessageSquare, Sparkles } from "lucide-react";
 
 export function ShoppingVisibilitySection() {
   return (
-    <section className="py-12 md:py-24 bg-[#f8f9fb] relative overflow-hidden">
+    <section className="py-12 md:py-24 bg-secondary relative overflow-hidden">
       <div className="container px-4 relative">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -92,9 +92,9 @@ function PhoneMockup({ children, label, highlight, accent }: { children: React.R
   return (
     <div className="flex flex-col items-center gap-1.5 md:gap-2">
       <div className={`w-full rounded-[1rem] md:rounded-[1.5rem] border-2 md:border-[3px] p-1 md:p-1.5 shadow-lg md:shadow-xl ${
-        highlight ? "border-primary/40 bg-white shadow-primary/10" :
-        accent ? "border-emerald-400/40 bg-white shadow-emerald-500/10" :
-        "border-border/50 bg-white"
+        highlight ? "border-primary/40 bg-card shadow-primary/10" :
+        accent ? "border-emerald-400/40 bg-card shadow-emerald-500/10" :
+        "border-border/50 bg-card"
       }`}>
         {/* Notch */}
         <div className="flex justify-center mb-0.5 md:mb-1">

@@ -28,7 +28,7 @@ export function ShopifyIntegrationSection() {
   };
 
   return (
-    <section className="py-20 md:py-28 bg-gradient-to-b from-white to-[#f8f7f4]">
+    <section className="py-20 md:py-28 bg-gradient-to-b from-card to-secondary">
       <div className="container px-4">
         <motion.div
           initial={{ opacity: 0, y: 24 }}
@@ -37,7 +37,7 @@ export function ShopifyIntegrationSection() {
           transition={{ duration: 0.5 }}
           className="mx-auto max-w-5xl"
         >
-          <div className="rounded-3xl border border-[#e8e6df] bg-white overflow-hidden shadow-[0_8px_40px_rgba(0,0,0,0.04)]">
+          <div className="rounded-3xl border border-[#e8e6df] bg-card overflow-hidden shadow-[0_8px_40px_rgba(0,0,0,0.04)]">
             <div className="grid md:grid-cols-2 gap-0">
               {/* Left: pitch */}
               <div className="p-8 md:p-12">
@@ -50,17 +50,17 @@ export function ShopifyIntegrationSection() {
                   </svg>
                   GEO Shopping for Shopify
                 </div>
-                <h2 className="mt-4 text-3xl md:text-4xl font-bold text-gray-900 leading-tight">
+                <h2 className="mt-4 text-3xl md:text-4xl font-bold text-foreground leading-tight">
                   Turn your Shopify store into an AI‑citation machine.
                 </h2>
-                <p className="mt-4 text-gray-600 text-lg leading-relaxed">
+                <p className="mt-4 text-muted-foreground text-lg leading-relaxed">
                   Install our Shopify app in one click. We import your products, detect your shop's language and
                   automatically generate optimized articles that get cited by ChatGPT, Gemini and Perplexity —
                   and publish them directly to your Shopify blog.
                 </p>
                 <ul className="mt-6 space-y-2.5">
                   {perks.map((p) => (
-                    <li key={p.label} className="flex items-center gap-2.5 text-sm text-gray-700">
+                    <li key={p.label} className="flex items-center gap-2.5 text-sm text-foreground/80">
                       <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
                         <Check className="h-3.5 w-3.5" />
                       </span>
@@ -72,11 +72,11 @@ export function ShopifyIntegrationSection() {
 
               {/* Right: install box */}
               <div className="p-8 md:p-12 bg-gradient-to-br from-[#f5faf0] to-[#e8f4de] border-l border-[#e8e6df] flex flex-col justify-center">
-                <div className="rounded-2xl bg-white border border-[#d9e8c9] p-6 shadow-sm">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                <div className="rounded-2xl bg-card border border-[#d9e8c9] p-6 shadow-sm">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                     Your Shopify store URL
                   </label>
-                  <div className="mt-2 flex items-center rounded-xl border border-gray-200 bg-white overflow-hidden focus-within:ring-2 focus-within:ring-[#96bf48]/40">
+                  <div className="mt-2 flex items-center rounded-xl border border-border bg-card overflow-hidden focus-within:ring-2 focus-within:ring-[#96bf48]/40">
                     <Input
                       value={shop}
                       onChange={(e) => setShop(e.target.value)}
@@ -93,11 +93,11 @@ export function ShopifyIntegrationSection() {
                     Install on Shopify
                     <ArrowRight className="h-4 w-4 ml-1.5" />
                   </Button>
-                  <p className="mt-3 text-xs text-gray-500 text-center">
+                  <p className="mt-3 text-xs text-muted-foreground text-center">
                     Free 3-day trial · Cancel anytime · No credit card until day 4
                   </p>
                 </div>
-                <p className="mt-4 text-xs text-gray-500 text-center">
+                <p className="mt-4 text-xs text-muted-foreground text-center">
                   Already using AutoPilot Geo?{" "}
                   <a href="/dashboard" className="text-[#5c8a1f] font-semibold hover:underline">
                     Open the app →
