@@ -60,5 +60,13 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
+      - name: Deploy generate-30-gso-contents
+        run: |
+          supabase functions deploy generate-30-gso-contents \
+            --project-ref pnohfokjlhpzrkczruju \
+            --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
       - name: Success
         run: echo "✅ All Edge Functions deployed successfully!"
