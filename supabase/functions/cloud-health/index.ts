@@ -1,6 +1,7 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 
 Deno.serve(async (req) => {
+  const started = performance.now();
   const headers = { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store, max-age=0' };
   if (req.method === 'OPTIONS') return new Response(null, { headers });
   if (!['GET', 'HEAD'].includes(req.method)) return new Response(null, { status: 405, headers: { ...headers, Allow: 'GET, HEAD, OPTIONS' } });
@@ -26,8 +27,8 @@ Deno.serve(async (req) => {
   }
   const healthy = database && auth;
   return new Response(req.method === 'HEAD' ? null : JSON.stringify({
-    status: healthy ? 'ok' : 'unavailable',
-    checks: { database, auth },
-    timestamp: new Date().toISOString(),
+    ok: healthy,
+    status: healthy ? 'OK' : 'UNAVAILABLE',
+    latencyMs: Math.round(performance.now() - started),
   }), { status: healthy ? 200 : 503, headers });
 });

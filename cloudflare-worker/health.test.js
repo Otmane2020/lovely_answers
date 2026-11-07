@@ -6,7 +6,7 @@ test('Cloud monitor returns 200 only when database and auth pass', async () => {
   const original = globalThis.fetch;
   try {
     for (const [database, auth, expected] of [[true, true, 200], [false, true, 503], [true, false, 503]]) {
-      globalThis.fetch = async () => Response.json({ status: 'ok', checks: { database, auth } });
+      globalThis.fetch = async () => Response.json({ ok: database && auth, status: database && auth ? 'OK' : 'UNAVAILABLE', latencyMs: 58 });
       const response = await worker.fetch(new Request('https://autopilotgeo.com/api/public/health/cloud'));
       assert.equal(response.status, expected);
       assert.match(response.headers.get('Cache-Control'), /no-store/);

@@ -53,6 +53,7 @@ import Onboarding from "@/views/Onboarding";
 import AeoWizard from "@/views/AeoWizard";
 import OAuthConsent from "@/views/OAuthConsent";
 import Connect from "@/views/Connect";
+import CloudHealth from "@/views/CloudHealth";
 import { SubscriptionGate } from "@/components/auth/SubscriptionGate";
 
 const gated = (el: React.ReactNode) => <SubscriptionGate>{el}</SubscriptionGate>;
@@ -62,6 +63,7 @@ export default function App() {
     <BrowserRouter>
       <ScrollToTop />
       <Routes>
+        <Route path="/api/public/health/cloud" element={<CloudHealth />} />
         <Route path="/" element={<IndexPage />} />
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/signup" element={<SignupPage />} />

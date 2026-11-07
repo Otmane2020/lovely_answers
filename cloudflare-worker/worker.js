@@ -96,7 +96,7 @@ export default {
           headers: { Accept: 'application/json' },
         });
         const result = await health.json();
-        const healthy = health.ok && result.status === 'ok' && result.checks?.database === true && result.checks?.auth === true;
+        const healthy = health.ok && result.ok === true && result.status === 'OK';
         return new Response(request.method === 'HEAD' ? null : JSON.stringify(result), {
           status: healthy ? 200 : 503, headers,
         });
