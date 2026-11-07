@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -23,7 +23,7 @@ interface LockedArticle {
 
 export default function AeoDashboard() {
   const router = useRouter();
-  const { project } = useActiveProject();
+  const { project, projects, isLoading: projectsLoading } = useActiveProject();
   const { subscribed, startCheckout, isLoading } = useSubscription();
   useRedditPreload();
   
@@ -32,6 +32,16 @@ export default function AeoDashboard() {
   const [lockedCount, setLockedCount] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
+  const geoTriggeredRef = useRef<string | null>(null);
+
+  // Safety net: if subscribed user has no project yet, send them to the wizard
+  useEffect(() => {
+    if (projectsLoading) return;
+    if (!subscribed) return;
+    if (!projects || projects.length === 0) {
+      router.replace("/wizard");
+    }
+  }, [projectsLoading, subscribed, projects, router]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -61,6 +71,31 @@ export default function AeoDashboard() {
       } catch (error) { console.error('Error fetching data:', error); }
     };
     fetchData();
+  }, [project]);
+
+  // Start the GEO 30-day engine as soon as a project exists, even before checkout.
+  useEffect(() => {
+    const triggerGeoPlanning = async () => {
+      if (!project || geoTriggeredRef.current === project.id) return;
+      geoTriggeredRef.current = project.id;
+
+      const now = new Date();
+      const in30 = new Date();
+      in30.setDate(now.getDate() + 30);
+
+      const { count } = await supabase
+        .from("geo_contents")
+        .select("id", { count: "exact", head: true })
+        .eq("project_id", project.id)
+        .gte("scheduled_date", now.toISOString())
+        .lte("scheduled_date", in30.toISOString());
+
+      if ((count || 0) < 30) {
+        await supabase.functions.invoke("generate-30-gso-contents", { body: { projectId: project.id } });
+      }
+    };
+
+    triggerGeoPlanning().catch((error) => console.error("GEO auto-start failed:", error));
   }, [project]);
 
   const stats = [
@@ -157,7 +192,7 @@ export default function AeoDashboard() {
         <Card className="p-6 bg-gradient-to-r from-primary/10 to-blue-500/10 border-primary/20">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-[#1a2058]">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-[hsl(222,47%,11%)]">
                 <Crown className="w-6 h-6 text-white" />
               </div>
               <div>
@@ -167,7 +202,7 @@ export default function AeoDashboard() {
                 </p>
               </div>
             </div>
-            <Button onClick={() => router.push('/checkout')} size="lg" className="bg-[#1a2058] hover:bg-[#232c66] text-white">
+            <Button onClick={() => router.push('/checkout')} size="lg" className="bg-[hsl(222,47%,11%)] hover:bg-[hsl(222,47%,15%)] text-white">
               Subscribe to Unlock <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </div>
@@ -178,7 +213,7 @@ export default function AeoDashboard() {
         <Card className="p-6 bg-primary/5 border-primary/20">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-[#1a2058]">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-[hsl(222,47%,11%)]">
                 <Check className="w-6 h-6 text-white" />
               </div>
               <div>
@@ -207,7 +242,7 @@ export default function AeoDashboard() {
                 <p className="text-3xl font-bold mt-2">{stat.value}</p>
                 {stat.sublabel && <p className="text-xs text-muted-foreground mt-1">{stat.sublabel}</p>}
               </div>
-              <div className="w-10 h-10 rounded-xl bg-[#1a2058] flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-[hsl(222,47%,11%)] flex items-center justify-center">
                 <stat.icon className="w-5 h-5 text-white" />
               </div>
             </div>
@@ -237,7 +272,11 @@ export default function AeoDashboard() {
               >
                 <div className="flex items-center gap-3 min-w-0">
                   {subscribed ? (
-                    <FileText className="w-4 h-4 text-primary flex-shrink-0" />
+                    article.status === "locked" ? (
+                      <Loader2 className="w-4 h-4 text-primary animate-spin flex-shrink-0" />
+                    ) : (
+                      <FileText className="w-4 h-4 text-primary flex-shrink-0" />
+                    )
                   ) : (
                     <Lock className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                   )}
@@ -261,7 +300,7 @@ export default function AeoDashboard() {
 
           {!subscribed && (
             <div className="mt-4 text-center">
-              <Button onClick={startCheckout} disabled={isLoading} className="bg-[#1a2058] hover:bg-[#232c66] text-white">
+              <Button onClick={startCheckout} disabled={isLoading} className="bg-[hsl(222,47%,11%)] hover:bg-[hsl(222,47%,15%)] text-white">
                 <Crown className="w-4 h-4 mr-2" />
                 Unlock All {lockedArticles.length} Articles
               </Button>
@@ -276,7 +315,7 @@ export default function AeoDashboard() {
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
           {quickActions.map((action, index) => (
             <Card key={index} className="p-6 hover:border-foreground/20 transition-all cursor-pointer group" onClick={() => router.push(action.url)}>
-              <div className="w-12 h-12 rounded-xl bg-[#1a2058] flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+              <div className="w-12 h-12 rounded-xl bg-[hsl(222,47%,11%)] flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                 <action.icon className="w-6 h-6 text-white" />
               </div>
               <h3 className="font-bold mb-1">{action.title}</h3>
@@ -290,7 +329,7 @@ export default function AeoDashboard() {
       </div>
 
       {/* Bottom CTA */}
-      <Card className="bg-[#1a2058] border-white/10 p-8">
+      <Card className="bg-[hsl(222,47%,11%)] border-white/10 p-8">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           <div>
             <h2 className="text-2xl font-bold mb-2 text-white">Ready to be cited by AI?</h2>
@@ -303,7 +342,7 @@ export default function AeoDashboard() {
           </div>
           <Button 
             size="lg" 
-            className="bg-white text-[#1a2058] hover:bg-white/90" 
+            className="bg-white text-[hsl(222,47%,11%)] hover:bg-white/90" 
             onClick={() => subscribed ? router.push('/wizard') : router.push('/checkout')}
           >
             {subscribed ? 'Start wizard' : 'Subscribe now'} <ArrowRight className="w-5 h-5 ml-2" />

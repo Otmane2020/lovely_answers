@@ -64,7 +64,7 @@ export default function ShoppingProduct() {
         <Button
           onClick={handleGenerate}
           disabled={generateAI.isPending}
-          className="bg-[#1a2058] hover:bg-[#232c66] text-white"
+          className="bg-[hsl(222,47%,11%)] hover:bg-[hsl(222,47%,15%)] text-white"
         >
           {generateAI.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Sparkles className="w-4 h-4 mr-2" />}
           {product.ai_faq ? "Regenerate" : "Generate AI Content"}

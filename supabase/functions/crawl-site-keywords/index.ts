@@ -191,7 +191,7 @@ Deno.serve(async (req) => {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              model: 'google/gemma-4-31b-it:free',
+              model: 'google/gemini-2.0-flash-exp:free',
               messages: [{
                 role: 'user',
                 content: `Extract SEO keywords from this website content. For each keyword, identify:

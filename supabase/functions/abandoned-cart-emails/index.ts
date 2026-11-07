@@ -80,7 +80,7 @@ function getEmail1Hour(name?: string, brandName?: string): { subject: string; ht
       <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="text-align: center; margin-bottom: 25px;">
-          <h1 style="color: #2e3a8c; margin: 0;">Hey${name ? ` ${name}` : ""}! 👋</h1>
+          <h1 style="color: #7c3aed; margin: 0;">Hey${name ? ` ${name}` : ""}! 👋</h1>
         </div>
         
         <p>You started setting up AutoPilot Geo${brandName ? ` for <strong>${brandName}</strong>` : ""} — you were just one step away from boosting your AI search visibility!</p>
@@ -94,7 +94,7 @@ function getEmail1Hour(name?: string, brandName?: string): { subject: string; ht
         </ul>
         
         <div style="text-align: center; margin: 30px 0;">
-          <a href="${APP_URL}/checkout" style="background: linear-gradient(135deg, #2e3a8c, #5f6ce0); color: white; padding: 14px 35px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; display: inline-block;">Complete My Subscription →</a>
+          <a href="${APP_URL}/checkout" style="background: linear-gradient(135deg, #7c3aed, #a855f7); color: white; padding: 14px 35px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; display: inline-block;">Complete My Subscription →</a>
         </div>
         
         <p>Questions? Just reply to this email.</p>
@@ -103,7 +103,7 @@ function getEmail1Hour(name?: string, brandName?: string): { subject: string; ht
         
         <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
         <p style="font-size: 12px; color: #888; text-align: center;">
-          <a href="${APP_URL}" style="color: #2e3a8c;">autopilotgeo.com</a>
+          <a href="${APP_URL}" style="color: #7c3aed;">autopilotgeo.com</a>
         </p>
       </body>
       </html>
@@ -121,21 +121,21 @@ function getEmail24Hours(name?: string, couponCode: string = "SAVE20"): { subjec
       <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="text-align: center; margin-bottom: 25px;">
-          <h1 style="color: #2e3a8c; font-size: 26px;">Still thinking about it? 🤔</h1>
+          <h1 style="color: #7c3aed; font-size: 26px;">Still thinking about it? 🤔</h1>
         </div>
         
         <p>Hey${name ? ` ${name}` : ""}!</p>
         
         <p>We noticed you haven't completed your subscription yet. To make the decision easier, here's a little something:</p>
         
-        <div style="background: linear-gradient(135deg, #2e3a8c10, #5f6ce020); padding: 25px; border-radius: 12px; text-align: center; margin: 25px 0; border: 2px dashed #2e3a8c;">
+        <div style="background: linear-gradient(135deg, #7c3aed10, #a855f720); padding: 25px; border-radius: 12px; text-align: center; margin: 25px 0; border: 2px dashed #7c3aed;">
           <p style="margin: 0 0 8px; font-size: 14px; color: #666;">Your exclusive code:</p>
-          <p style="margin: 0; font-size: 32px; font-weight: bold; color: #2e3a8c; letter-spacing: 2px;">${couponCode}</p>
+          <p style="margin: 0; font-size: 32px; font-weight: bold; color: #7c3aed; letter-spacing: 2px;">${couponCode}</p>
           <p style="margin: 10px 0 0; font-size: 18px; color: #333;">20% off your first month</p>
         </div>
         
         <div style="text-align: center; margin: 30px 0;">
-          <a href="${APP_URL}/checkout" style="background: linear-gradient(135deg, #2e3a8c, #5f6ce0); color: white; padding: 14px 35px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; display: inline-block;">Claim My 20% Discount →</a>
+          <a href="${APP_URL}/checkout" style="background: linear-gradient(135deg, #7c3aed, #a855f7); color: white; padding: 14px 35px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; display: inline-block;">Claim My 20% Discount →</a>
         </div>
         
         <p style="font-size: 14px; color: #666;">This code is valid for <strong>48 hours</strong>.</p>
@@ -144,7 +144,7 @@ function getEmail24Hours(name?: string, couponCode: string = "SAVE20"): { subjec
         
         <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
         <p style="font-size: 12px; color: #888; text-align: center;">
-          <a href="${APP_URL}" style="color: #2e3a8c;">autopilotgeo.com</a>
+          <a href="${APP_URL}" style="color: #7c3aed;">autopilotgeo.com</a>
         </p>
       </body>
       </html>
@@ -195,7 +195,7 @@ function getEmail72Hours(name?: string, couponCode: string = "WELCOME50"): { sub
         
         <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
         <p style="font-size: 12px; color: #888; text-align: center;">
-          <a href="${APP_URL}" style="color: #2e3a8c;">autopilotgeo.com</a>
+          <a href="${APP_URL}" style="color: #7c3aed;">autopilotgeo.com</a>
         </p>
       </body>
       </html>

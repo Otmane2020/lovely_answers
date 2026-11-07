@@ -52,59 +52,60 @@ serve(async (req) => {
       );
     }
 
-    // Unlike get-search-console-data / list-search-console-sites, this
-    // function used to send integration.config.access_token straight to
-    // Google with no expiry check — any token older than ~1h just 401'd
-    // with a generic "Failed to fetch GMB accounts" instead of refreshing.
-    let accessToken = integration.config.access_token as string;
-    const expiresAt = integration.config.token_expires_at
-      ? new Date(integration.config.token_expires_at).getTime()
-      : 0;
-    const refreshToken = integration.config.refresh_token as string | undefined;
+    let accessToken = integration.config.access_token;
 
-    if (expiresAt && expiresAt < Date.now() + 60_000) {
-      if (!refreshToken) {
-        return new Response(
-          JSON.stringify({ error: "GMB token expired and no refresh token stored", needsReconnect: true, business: null, locations: [] }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+    // Try to refresh token if we have a refresh_token
+    const refreshToken = integration.config.refresh_token;
+    if (refreshToken) {
+      const clientId = Deno.env.get("GMB_GOOGLE_CLIENT_ID") || Deno.env.get("GOOGLE_CLIENT_ID");
+      const clientSecret = Deno.env.get("GMB_GOOGLE_CLIENT_SECRET") || Deno.env.get("GOOGLE_CLIENT_SECRET");
+      if (clientId && clientSecret) {
+        const expiresAt = integration.config.token_expires_at;
+        const isExpired = !expiresAt || new Date(expiresAt) <= new Date();
+        if (isExpired) {
+          console.log("GMB token expired, refreshing...");
+          const refreshRes = await fetch("https://oauth2.googleapis.com/token", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+              client_id: clientId,
+              client_secret: clientSecret,
+              refresh_token: refreshToken,
+              grant_type: "refresh_token",
+            }),
+          });
+          if (refreshRes.ok) {
+            const refreshData = await refreshRes.json();
+            accessToken = refreshData.access_token;
+            // Update stored token
+            await supabase
+              .from("integrations")
+              .update({
+                config: {
+                  ...integration.config,
+                  access_token: accessToken,
+                  token_expires_at: new Date(Date.now() + refreshData.expires_in * 1000).toISOString(),
+                },
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", integration.id);
+            console.log("GMB token refreshed successfully");
+          } else {
+            const refreshError = await refreshRes.text();
+            console.error("GMB token refresh failed:", refreshError);
+            // Mark integration as disconnected since refresh failed
+            await supabase
+              .from("integrations")
+              .update({ is_connected: false, updated_at: new Date().toISOString() })
+              .eq("id", integration.id);
+            return new Response(
+              JSON.stringify({ error: "GMB session expired. Please reconnect your Google Business account.", business: null, locations: [], tokenExpired: true }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+        }
       }
-      const clientId = Deno.env.get("GOOGLE_CLIENT_ID");
-      const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET");
-      const refreshRes = await fetch("https://oauth2.googleapis.com/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          client_id: clientId ?? "",
-          client_secret: clientSecret ?? "",
-          refresh_token: refreshToken,
-          grant_type: "refresh_token",
-        }),
-      });
-      if (!refreshRes.ok) {
-        console.error("GMB token refresh failed:", await refreshRes.text());
-        await supabase.from("integrations").update({ is_connected: false }).eq("id", integration.id);
-        return new Response(
-          JSON.stringify({ error: "GMB token refresh failed", needsReconnect: true, business: null, locations: [] }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      const refreshed = await refreshRes.json();
-      accessToken = refreshed.access_token;
-      await supabase
-        .from("integrations")
-        .update({
-          config: {
-            ...integration.config,
-            access_token: accessToken,
-            token_expires_at: new Date(Date.now() + refreshed.expires_in * 1000).toISOString(),
-          },
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", integration.id);
     }
-
-    // Fetch accounts from Google Business Profile API
     const accountsResponse = await fetch(
       "https://mybusinessaccountmanagement.googleapis.com/v1/accounts",
       {
@@ -115,7 +116,23 @@ serve(async (req) => {
     if (!accountsResponse.ok) {
       const errorText = await accountsResponse.text();
       console.error("GMB accounts error:", errorText);
-      throw new Error("Failed to fetch GMB accounts");
+      const status = accountsResponse.status;
+      if (status === 429) {
+        return new Response(
+          JSON.stringify({ error: "Google API rate limit exceeded. Please try again in a minute.", business: null, locations: [], rateLimited: true }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (status === 401 || status === 403) {
+        return new Response(
+          JSON.stringify({ error: "GMB access token expired. Please reconnect.", business: null, locations: [] }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      return new Response(
+        JSON.stringify({ error: "Failed to fetch GMB accounts", business: null, locations: [] }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const accountsData = await accountsResponse.json();
@@ -130,11 +147,12 @@ serve(async (req) => {
 
     // Fetch locations from ALL accounts
     const allLocations: any[] = [];
+    const READ_MASK = "name,title,storefrontAddress,phoneNumbers,websiteUri,metadata";
 
     for (const account of accounts) {
       try {
         const locationsResponse = await fetch(
-          `https://mybusinessbusinessinformation.googleapis.com/v1/${account.name}/locations`,
+          `https://mybusinessbusinessinformation.googleapis.com/v1/${account.name}/locations?readMask=${encodeURIComponent(READ_MASK)}&pageSize=100`,
           {
             headers: { Authorization: `Bearer ${accessToken}` },
           }
@@ -143,8 +161,15 @@ serve(async (req) => {
         if (locationsResponse.ok) {
           const locationsData = await locationsResponse.json();
           if (locationsData.locations) {
-            allLocations.push(...locationsData.locations);
+            for (const loc of locationsData.locations) {
+              // Build full resource path required by v4 Posts API
+              loc.__fullName = `${account.name}/${loc.name}`;
+              allLocations.push(loc);
+            }
           }
+        } else {
+          const errTxt = await locationsResponse.text();
+          console.error(`GMB locations error for ${account.name} (${locationsResponse.status}):`, errTxt);
         }
       } catch (err) {
         console.error(`Error fetching locations for ${account.name}:`, err);
@@ -153,21 +178,22 @@ serve(async (req) => {
 
     if (allLocations.length === 0) {
       return new Response(
-        JSON.stringify({ business: null, locations: [], error: "No business location found" }),
+        JSON.stringify({ business: null, locations: [], error: "No business location found. Verify the connected Google account manages a Business Profile and that the GMB API is enabled." }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Format ALL locations
+    // Format ALL locations (id = full accounts/.../locations/... path)
     const locations = allLocations.map((location) => ({
-      id: location.name,
+      id: location.__fullName,
       name: location.title || location.locationName,
-      address: formatAddress(location.address),
+      address: formatAddress(location.storefrontAddress || location.address),
       phone: location.phoneNumbers?.primaryPhone || "",
       website: location.websiteUri || "",
       rating: location.metadata?.rating || 0,
       reviewCount: location.metadata?.reviewCount || 0,
     }));
+
 
     // Return first location as "business" for backward compat, plus all locations
     const selectedIds: string[] = integration.config.selected_locations || [];

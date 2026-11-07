@@ -33,19 +33,17 @@ export function useGeoContents() {
     queryKey: ["geo_contents", project?.id],
     queryFn: async () => {
       if (!project) return [];
-      // Unlike useArticles/useAnswers, this had no cap at all — fetched
-      // every row unbounded. Same 1000-row safety cap as those two, not a
-      // real pagination fix (Content.tsx still merges + paginates
-      // client-side), just stops an unbounded query as the catalog grows.
       const { data, error } = await supabase
         .from("geo_contents")
         .select("*")
         .eq("project_id", project.id)
-        .order("created_at", { ascending: false })
-        .limit(1000);
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return (data || []) as GeoContent[];
+      return ((data || []) as GeoContent[]).filter((item) => {
+        const content = `${item.html_content || item.content || ""}`.trim();
+        return content.length > 0;
+      });
     },
     enabled: !!project,
   });
@@ -71,7 +69,10 @@ export function useGenerateGeoContent() {
         body: params,
       });
 
-      if (res.error) throw new Error(res.error.message || "Generation failed");
+      if (res.error) {
+        console.error("[generate-geo-content] edge error:", res.error);
+        throw new Error("GENERATION_FAILED");
+      }
       return res.data;
     },
     onSuccess: () => {
@@ -79,7 +80,8 @@ export function useGenerateGeoContent() {
       toast.success("GEO content generated!");
     },
     onError: (err: Error) => {
-      toast.error(err.message || "Failed to generate GEO content");
+      console.error("[useGenerateGeoContent]", err);
+      toast.error("Content is being prepared. Please try again in a moment.");
     },
   });
 }

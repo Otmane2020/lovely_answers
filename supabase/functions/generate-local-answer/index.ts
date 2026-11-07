@@ -1,8 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
-import { loadGenerationContext } from "../_shared/project-context.ts";
-import { chatCompletion } from "../_shared/ai-call.ts";
-
+import { reviewWithClaude } from "../_shared/claude-review.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,21 +21,27 @@ serve(async (req) => {
       );
     }
 
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, serviceRoleKey);
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
 
     const token = authHeader.replace("Bearer ", "");
-    // The daily planning cron calls this with the service role key (no
-    // human session behind it) to generate Local AEO content unattended —
-    // only fall through to a real user check when it's not that key.
-    if (token !== serviceRoleKey) {
-      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-      if (authError || !user) {
-        return new Response(
-          JSON.stringify({ error: "Unauthorized" }),
-          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
+    if (!OPENROUTER_API_KEY) {
+      return new Response(
+        JSON.stringify({ error: "OPENROUTER_API_KEY not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const { projectId, question, businessName, location, businessContext } = await req.json();
@@ -51,7 +55,6 @@ serve(async (req) => {
 
     // Get project details for additional context
     let projectContext = "";
-    let projectContextBlocks = "";
     let language = "en";
     
     if (projectId) {
@@ -69,15 +72,6 @@ serve(async (req) => {
 
       projectContext = settings?.business_description || project?.business_description || "";
       language = settings?.language || project?.language || "en";
-
-      // Fail-safe project context (includes LOCATION data). Never blocks on a
-      // missing provider — falls back to scraping / analysis / existing keywords.
-      const { blocks, readiness, degraded } = await loadGenerationContext(supabase, projectId, {
-        includeLocation: true,
-        maxKeywords: 12,
-      });
-      projectContextBlocks = blocks;
-      console.log(`[generate-local-answer] context readiness=${readiness} degraded=${degraded.join(" | ") || "none"}`);
     }
 
     // Build rich context from Places API data
@@ -135,12 +129,8 @@ ABSOLUTE RULES:
 7. NEUTRAL expert tone - no advertising
 8. Include practical tips and mistakes to avoid`;
 
-    const localCtxBlock = projectContextBlocks
-      ? projectContextBlocks + "\n\nLOCAL AEO : reponse ancree sur l'etablissement et sa zone reelle. Utilise les donnees LOCATION et le contexte ci-dessus, jamais des generalites.\n\n"
-      : "";
-
     const userPrompt = language === "fr"
-      ? `${localCtxBlock}Informations sur l'etablissement:
+      ? `Informations sur l'etablissement:
 Nom: ${businessName || "Etablissement local"}
 Localisation: ${location || "Zone locale"}
 ${contextParts.length > 0 ? "\nDetails:\n" + contextParts.join("\n") : ""}
@@ -157,7 +147,7 @@ STRUCTURE OBLIGATOIRE:
 6. Inclure le contexte temporel (${currentYear})
 
 Retourne UNIQUEMENT le texte de la reponse en markdown. Pas de JSON. Pas de guillemets autour. 250-400 mots.`
-      : `${localCtxBlock}Business Information:
+      : `Business Information:
 Name: ${businessName || "Local Business"}
 Location: ${location || "Local area"}
 ${contextParts.length > 0 ? "\nDetails:\n" + contextParts.join("\n") : ""}
@@ -175,24 +165,45 @@ MANDATORY STRUCTURE:
 
 Return ONLY the answer text in markdown. No JSON. No quotes around it. 250-400 words.`;
 
-    const aiData = await chatCompletion({
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 0.5,
-      max_tokens: 2000,
+    const aiResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + OPENROUTER_API_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: 0.5,
+        max_tokens: 2000,
+      }),
     });
 
-    const answer = aiData.choices?.[0]?.message?.content || "";
+    if (!aiResponse.ok) {
+      throw new Error("AI request failed: " + aiResponse.status);
+    }
 
+    const aiData = await aiResponse.json();
+    const rawAnswer = aiData.choices?.[0]?.message?.content || "";
+
+    const reviewed = await reviewWithClaude({
+      content: rawAnswer.trim(),
+      contentType: "local_answer",
+      brand: businessName,
+      question,
+      topic: location,
+    });
 
     return new Response(
       JSON.stringify({
-        answer: answer.trim(),
+        answer: reviewed.content.trim(),
         question,
         businessName,
         location,
+        reviewed: reviewed.reviewed,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

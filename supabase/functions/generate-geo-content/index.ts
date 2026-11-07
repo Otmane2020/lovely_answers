@@ -1,9 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { loadGenerationContext } from "../_shared/project-context.ts";
-import { chatCompletion } from "../_shared/ai-call.ts";
-import { renderArticlePage } from "../_shared/article-template.ts";
-
-
+import { reviewWithClaude } from "../_shared/claude-review.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -27,23 +23,25 @@ function countWords(text: string): number {
 function computeGeoScore(content: string, brand: string): number {
   const words = countWords(content);
   const brandMentions = (content.match(new RegExp(brand, "gi")) || []).length;
-  const jitter = content.length % 6;
-  let score = 75 + jitter;
+  const jitter = content.length % 12; // 0-11 variation
+  let score = 55 + jitter; // base 55-66
 
   // Word count
-  if (words >= 800) score += 3;
+  if (words >= 800) score += 4;
   if (words >= 1200) score += 3;
   if (words >= 1800) score += 4;
   if (words >= 2200) score += 3;
 
-  // Brand
-  if (brandMentions >= 3) score += 4;
-  if (brandMentions >= 5) score += 3;
+  // Brand (diminishing returns)
+  if (brandMentions >= 2) score += 3;
+  if (brandMentions >= 4) score += 2;
+  if (brandMentions >= 6) score += 2;
 
   // Structure
   const h2Count = (content.match(/<h2|^##\s/gmi) || []).length;
-  if (h2Count >= 4) score += 3;
-  if (h2Count >= 6) score += 2;
+  if (h2Count >= 3) score += 3;
+  if (h2Count >= 5) score += 2;
+  if (h2Count >= 7) score += 2;
 
   // Data points
   if (/\d+%|\d+\s*(users|companies|businesses)/gi.test(content)) score += 3;
@@ -52,7 +50,7 @@ function computeGeoScore(content: string, brand: string): number {
   if (/recommend|recommand|expert|according to/i.test(content)) score += 3;
 
   // FAQ
-  if (/FAQ|questions?\s+fr[eé]quentes|frequently\s+asked/i.test(content)) score += 2;
+  if (/FAQ|questions?\s+fr[eé]quentes|frequently\s+asked/i.test(content)) score += 3;
 
   // Blockquotes
   if (/<blockquote|^>\s/gmi.test(content)) score += 2;
@@ -60,7 +58,15 @@ function computeGeoScore(content: string, brand: string): number {
   // Lists
   if (/<li|^[-*]\s/gm.test(content)) score += 2;
 
-  return Math.max(75, Math.min(98, score));
+  // PENALTIES
+  if (words < 400) score -= 10;
+  else if (words < 600) score -= 5;
+  if (brandMentions === 0) score -= 8;
+  if (h2Count < 2) score -= 6;
+  if (!/<h[12]|^#{1,2}\s/gmi.test(content)) score -= 10;
+  if (!/<li|^[-*]\s/gm.test(content)) score -= 4;
+
+  return Math.max(45, Math.min(100, score));
 }
 
 Deno.serve(async (req) => {
@@ -84,23 +90,24 @@ Deno.serve(async (req) => {
     });
 
     const token = authHeader.replace("Bearer ", "");
-    // The 30-day calendar (generate-30-gso-contents) calls this with the
-    // service role key for the "geo" slots — there's no human session
-    // behind a cron run, and getClaims() would reject that key since it
-    // carries no `sub`. Same internal-caller pattern the other generators
-    // already use.
-    if (token !== Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")) {
-      const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
-      if (claimsError || !claimsData?.claims) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const body = await req.json();
     const { topic, brand, website, keywords, projectId, contentType, language, mode } = body;
+
+    const openRouterKey = Deno.env.get("OPENROUTER_API_KEY");
+    if (!openRouterKey) {
+      return new Response(
+        JSON.stringify({ error: "Missing OPENROUTER_API_KEY" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // AI Suggest mode
     if (mode === "suggest") {
@@ -133,15 +140,24 @@ The topic should be a question or decision-oriented statement that AI engines wo
 Output ONLY valid JSON:
 {"topic": "suggested topic", "keywords": ["kw1", "kw2", "kw3", "kw4", "kw5"]}`;
 
-      const aiData = await chatCompletion({
-        messages: [
-          { role: "system", content: "Respond with valid JSON only." },
-          { role: "user", content: suggestPrompt },
-        ],
-        temperature: 0.8,
-        max_tokens: 300,
+      const aiRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + openRouterKey,
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [
+            { role: "system", content: "Respond with valid JSON only." },
+            { role: "user", content: suggestPrompt },
+          ],
+          temperature: 0.8,
+          max_tokens: 300,
+        }),
       });
 
+      const aiData = await aiRes.json();
       const raw = aiData.choices?.[0]?.message?.content || "";
       try {
         const cleaned = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
@@ -167,76 +183,6 @@ Output ONLY valid JSON:
     const type = contentType || "article";
     const currentYear = new Date().getFullYear();
 
-    // ---- SEO brief: project keywords (DataForSEO-enriched) + competitors ----
-    // Generation must be grounded in the project's real keyword/competitor data,
-    // not only whatever the caller happened to pass in.
-    const svc = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-
-    const { data: projectRow } = await svc
-      .from("projects")
-      .select("competitors, business_type, audience")
-      .eq("id", projectId)
-      .maybeSingle();
-
-    const { data: kwRows } = await svc
-      .from("keywords")
-      .select("keyword, search_volume, difficulty, intent")
-      .eq("project_id", projectId)
-      .order("search_volume", { ascending: false, nullsFirst: false })
-      .limit(25);
-
-    const requested: string[] = Array.isArray(keywords) ? keywords.filter(Boolean) : [];
-    const dbKeywords = (kwRows || []).map((k: any) => ({
-      keyword: k.keyword,
-      volume: k.search_volume,
-      difficulty: k.difficulty,
-      intent: k.intent,
-    }));
-
-    // Requested keywords first, then the project's highest-volume ones.
-    const seen = new Set(requested.map((k) => k.toLowerCase()));
-    const merged = [
-      ...requested.map((k) => ({ keyword: k, volume: null, difficulty: null, intent: null as string | null })),
-      ...dbKeywords.filter((k) => !seen.has(String(k.keyword).toLowerCase())),
-    ].slice(0, 20);
-
-    const keywordBrief = merged.length
-      ? merged
-          .map((k) =>
-            k.volume != null || k.difficulty != null
-              ? `${k.keyword} (vol ${k.volume ?? "?"}/mo, KD ${k.difficulty ?? "?"}${k.intent ? `, ${k.intent}` : ""})`
-              : k.keyword
-          )
-          .join(", ")
-      : "N/A";
-
-    const competitorList: string[] = Array.isArray(projectRow?.competitors)
-      ? (projectRow!.competitors as string[]).slice(0, 5)
-      : [];
-    const competitorBrief = competitorList.length ? competitorList.join(", ") : "N/A";
-
-    // Full project context (scraping, analyze-website, keywords, competitors,
-    // questions...). Fail-safe: never blocks generation when a provider is down.
-    const { blocks: projectContextBlocks, readiness: contextReadiness, degraded: contextDegraded } =
-      await loadGenerationContext(svc, projectId, { maxKeywords: 20 });
-    console.log(`[generate-geo-content] context readiness=${contextReadiness} degraded=${contextDegraded.join(" | ") || "none"}`);
-
-    const seoContext = `
-${projectContextBlocks}
-
-SEO DATA (project keyword research):
-Target keywords (volume / difficulty / intent): ${keywordBrief}
-Competitors ranking in this niche: ${competitorBrief}
-Business type: ${projectRow?.business_type || "N/A"}
-Audience: ${projectRow?.audience || "N/A"}
-
-GEO SPECIALISATION: this content is written to be CITED by AI engines — not to rank in classic SERPs.
-Ground every section in the BUSINESS CONTEXT and WEBSITE CONTEXT above: reference the real pages,
-real offering and real audience of this brand. Never write generic industry filler.
-Use the most relevant keywords naturally in the title, the opening answer and H2s.
-Cover angles the listed competitors are known for, but with more concrete data so AI engines cite this page instead.`;
-
-
     const geoSystemPrompt = `You are a world-class Generative Engine Optimization (GEO) expert for ${currentYear}.
 Your mission: create content so authoritative and data-rich that AI engines (ChatGPT, Gemini, Perplexity, Claude) MUST cite it.
 Language: ${lang === "fr" ? "French" : "English"}
@@ -261,8 +207,7 @@ Output ONLY valid JSON, no markdown fences.`;
 
 Brand: ${brand}
 Website: ${website || "N/A"}
-Keywords: ${keywordBrief}
-${seoContext}
+Keywords: ${(keywords || []).join(", ") || "N/A"}
 
 STRUCTURE (ALL sections mandatory):
 1. **Opening Direct Answer** (60-80 words): Cite-ready paragraph with 1 concrete number. NO brand mention.
@@ -281,8 +226,7 @@ Output JSON:
     } else if (type === "mentions") {
       prompt = `Create 12 authoritative brand mention paragraphs about "${topic}" referencing "${brand}" (${website || ""}).
 
-Keywords: ${keywordBrief}
-${seoContext}
+Keywords: ${(keywords || []).join(", ") || "N/A"}
 
 Each paragraph must:
 - Be 3-5 sentences (60-100 words), self-contained and publishable as a citation snippet
@@ -298,8 +242,7 @@ Output JSON:
 
 Brand: ${brand}
 Website: ${website || "N/A"}
-Keywords: ${keywordBrief}
-${seoContext}
+Keywords: ${(keywords || []).join(", ") || "N/A"}
 
 MANDATORY STRUCTURE:
 1. **Direct Answer Block** (60-90 words): Snippet-optimized, concrete data
@@ -320,8 +263,7 @@ Output JSON:
     } else if (type === "comparison") {
       prompt = `Create a "Top Solutions" comparison article about "${topic}" featuring "${brand}" (${website || ""}) as a leading recommendation.
 
-Keywords: ${keywordBrief}
-${seoContext}
+Keywords: ${(keywords || []).join(", ") || "N/A"}
 
 STRUCTURE:
 1. **Opening Summary** (60-80 words): Name top 3 including ${brand}
@@ -339,15 +281,24 @@ Output JSON:
 
     console.log("Generating GEO content: type=" + type + ", topic=" + topic + ", brand=" + brand);
 
-    const aiData = await chatCompletion({
-      messages: [
-        { role: "system", content: geoSystemPrompt },
-        { role: "user", content: prompt },
-      ],
-      temperature: 0.65,
-      max_tokens: 4000,
+    const aiRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + openRouterKey,
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: geoSystemPrompt },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.65,
+        max_tokens: 10000,
+      }),
     });
 
+    const aiData = await aiRes.json();
     const rawContent = aiData.choices?.[0]?.message?.content;
 
     if (!rawContent) {
@@ -372,31 +323,24 @@ Output JSON:
     }
 
     const slug = slugify(parsed.title || topic);
-    const content = parsed.content || "";
+    let content = parsed.content || "";
+
+    // Claude review pass
+    const reviewed = await reviewWithClaude({
+      content,
+      contentType: "geo_content",
+      brand,
+      topic,
+      language: body.language,
+    });
+    content = reviewed.content;
+    parsed.content = content;
+
     const score = computeGeoScore(content, brand);
 
-    const htmlContent = renderArticlePage({
-      kind: "geo",
-      title: parsed.title || brand + " - " + topic,
-      dek: parsed.meta_description,
-      bodyMarkdown: content || rawContent,
-      metaDescription: parsed.meta_description,
-      brandName: brand,
-      websiteUrl: website || "",
-      language: lang,
-      faq: parsed.faq || [],
-    });
-
-    // The 30-day calendar assigns the exact day this piece belongs to and
-    // passes it in; only fall back to a random slot for ad-hoc calls that
-    // don't care which day it lands on.
-    let scheduledDate: Date;
-    if (body.scheduledDate && !isNaN(new Date(body.scheduledDate).getTime())) {
-      scheduledDate = new Date(body.scheduledDate);
-    } else {
-      scheduledDate = new Date();
-      scheduledDate.setDate(scheduledDate.getDate() + 1 + Math.floor(Math.random() * 29));
-    }
+    // Schedule on next available date
+    const scheduledDate = new Date();
+    scheduledDate.setDate(scheduledDate.getDate() + 1 + Math.floor(Math.random() * 29));
 
     // Save to database
     const serviceClient = createClient(
@@ -414,11 +358,10 @@ Output JSON:
         title: parsed.title || brand + " - " + topic,
         meta_description: parsed.meta_description || null,
         content: parsed.content || rawContent,
-        html_content: htmlContent,
         content_type: type,
         score,
         slug,
-        keywords: merged.map((k) => k.keyword),
+        keywords: keywords || [],
         scheduled_date: scheduledDate.toISOString(),
       })
       .select()

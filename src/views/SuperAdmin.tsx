@@ -17,9 +17,9 @@ import {
   MessageCircle, Send, Users, CreditCard, UserX, Shield, 
   LogOut, Clock, CheckCircle, AlertCircle, Mail, BarChart3,
   Plus, Trash2, Globe, Building, Phone, RefreshCw, Rocket, Megaphone,
-  Brain, Key, Target, TrendingUp, Lightbulb, Tag
+  Brain, Key, Target, TrendingUp, Lightbulb, Tag, Play
 } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { enUS } from "date-fns/locale";
@@ -28,6 +28,9 @@ import { OnboardingTracking } from "@/components/admin/OnboardingTracking";
 import { AdminUsersList } from "@/components/admin/AdminUsersList";
 import { ActiveArticleUsers } from "@/components/admin/ActiveArticleUsers";
 import { GoogleAdsManager } from "@/components/admin/GoogleAdsManager";
+import { RichTextEditor } from "@/components/admin/RichTextEditor";
+import { AdminEmails } from "@/components/admin/AdminEmails";
+import { VideoAnalytics } from "@/components/admin/VideoAnalytics";
 
 interface SupportTicket {
   id: string;
@@ -91,6 +94,23 @@ const SuperAdmin = () => {
   const [messages, setMessages] = useState<SupportMessage[]>([]);
   const [replyMessage, setReplyMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
+
+  // Resend mailbox state
+  const [resendSent, setResendSent] = useState<any[]>([]);
+  const [resendInbox, setResendInbox] = useState<any[]>([]);
+  const [isLoadingResend, setIsLoadingResend] = useState(false);
+  const [selectedEmail, setSelectedEmail] = useState<any | null>(null);
+  const [emailReply, setEmailReply] = useState("");
+  const [isSendingEmailReply, setIsSendingEmailReply] = useState(false);
+  const [emailViewMode, setEmailViewMode] = useState<"preview" | "html" | "text">("preview");
+  const [composeRecipients, setComposeRecipients] = useState<string[]>([]);
+  const [composeSubject, setComposeSubject] = useState("");
+  const [composeBody, setComposeBody] = useState("");
+  const [isComposing, setIsComposing] = useState(false);
+  const [composeAttachments, setComposeAttachments] = useState<File[]>([]);
+  const [replyAttachments, setReplyAttachments] = useState<File[]>([]);
+  const [allUsers, setAllUsers] = useState<{ id: string; email: string; full_name: string | null }[]>([]);
+  const [userSearch, setUserSearch] = useState("");
   
   // Users state
   const [subscribers, setSubscribers] = useState<SubscriptionInfo[]>([]);
@@ -155,6 +175,8 @@ const SuperAdmin = () => {
       loadSubscribers(),
       loadProspects(),
       loadAdminProspects(),
+      loadResendInbox(),
+      loadAllUsers(),
     ]);
   };
 
@@ -171,6 +193,93 @@ const SuperAdmin = () => {
       console.error("Error loading tickets:", error);
     }
   };
+
+  const loadResendSent = async () => {
+    setIsLoadingResend(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("resend-mailbox", {
+        body: { action: "list_sent" },
+      });
+      if (error) throw error;
+      setResendSent(data?.data || []);
+    } catch (e: any) {
+      toast({ title: "Erreur Resend", description: e.message, variant: "destructive" });
+    } finally {
+      setIsLoadingResend(false);
+    }
+  };
+
+  const loadResendInbox = async () => {
+    try {
+      // Inbox = ALL incoming emails captured by email-webhook into inbox_emails
+      const { data, error } = await supabase
+        .from("inbox_emails")
+        .select("id, from_email, from_name, to_email, subject, body_text, body_html, is_read, received_at")
+        .order("received_at", { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      setResendInbox(data || []);
+    } catch (e: any) {
+      console.error("Inbox load error:", e);
+    }
+  };
+
+  const loadAllUsers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, email, full_name")
+        .not("email", "is", null)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      setAllUsers((data || []) as any);
+    } catch (e: any) {
+      console.error("Users load error:", e);
+    }
+  };
+
+  const handleSendCompose = async () => {
+    if (!composeSubject.trim() || !composeBody.trim() || composeRecipients.length === 0) {
+      toast({ title: "Champs manquants", description: "Destinataires, sujet et message requis", variant: "destructive" });
+      return;
+    }
+    setIsComposing(true);
+    try {
+      const htmlBody = composeBody;
+      // Encode attachments to base64
+      const encodedAttachments = await Promise.all(
+        composeAttachments.map(async (f) => {
+          const buf = await f.arrayBuffer();
+          let binary = "";
+          const bytes = new Uint8Array(buf);
+          for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+          return { filename: f.name, content: btoa(binary), content_type: f.type || "application/octet-stream" };
+        })
+      );
+      const results = await Promise.allSettled(
+        composeRecipients.map((to) =>
+          supabase.functions.invoke("send-email", {
+            body: { type: "custom", to, subject: composeSubject, html: htmlBody, attachments: encodedAttachments },
+          })
+        )
+      );
+      const ok = results.filter((r) => r.status === "fulfilled").length;
+      const fail = results.length - ok;
+      toast({ title: "Envoi terminé", description: `${ok} envoyés, ${fail} échecs` });
+      if (ok > 0) {
+        setComposeSubject("");
+        setComposeBody("");
+        setComposeRecipients([]);
+        setComposeAttachments([]);
+        loadResendSent();
+      }
+    } catch (e: any) {
+      toast({ title: "Erreur d'envoi", description: e.message, variant: "destructive" });
+    } finally {
+      setIsComposing(false);
+    }
+  };
+
 
   const loadMessages = async (ticketId: string) => {
     try {
@@ -631,6 +740,14 @@ const SuperAdmin = () => {
               <Globe className="h-4 w-4" />
               Articles Actifs
             </TabsTrigger>
+            <TabsTrigger value="emails" className="justify-start gap-2 px-3 py-2.5 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg">
+              <Mail className="h-4 w-4" />
+              Emails
+            </TabsTrigger>
+            <TabsTrigger value="videos" className="justify-start gap-2 px-3 py-2.5 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg">
+              <Play className="h-4 w-4" />
+              Vidéos accueil
+            </TabsTrigger>
             <Separator className="my-2" />
             <Button
               variant="ghost"
@@ -656,6 +773,15 @@ const SuperAdmin = () => {
             <ActiveArticleUsers />
           </TabsContent>
 
+          <TabsContent value="emails">
+            <AdminEmails />
+          </TabsContent>
+
+          <TabsContent value="videos">
+            <VideoAnalytics />
+          </TabsContent>
+
+
 
 
           {/* Users Tab */}
@@ -670,6 +796,19 @@ const SuperAdmin = () => {
 
           {/* Support Tab */}
           <TabsContent value="support">
+            <Tabs defaultValue="tickets" className="w-full" onValueChange={(v) => {
+              if (v === "sent") loadResendSent();
+              if (v === "inbox") loadResendInbox();
+              if (v === "compose") loadAllUsers();
+            }}>
+              <TabsList className="mb-4">
+                <TabsTrigger value="tickets"><MessageCircle className="h-4 w-4 mr-2" />Tickets</TabsTrigger>
+                <TabsTrigger value="inbox"><Mail className="h-4 w-4 mr-2" />Boîte de réception</TabsTrigger>
+                <TabsTrigger value="sent"><Send className="h-4 w-4 mr-2" />Boîte d'envoi</TabsTrigger>
+                <TabsTrigger value="compose"><Plus className="h-4 w-4 mr-2" />Composer</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="tickets">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Tickets list */}
               <Card className="lg:col-span-1">
@@ -786,6 +925,174 @@ const SuperAdmin = () => {
                 </CardContent>
               </Card>
             </div>
+              </TabsContent>
+
+              {/* Inbox Resend */}
+              <TabsContent value="inbox">
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2"><Mail className="h-5 w-5" />Boîte de réception ({resendInbox.length})</CardTitle>
+                      <Button variant="outline" size="sm" onClick={loadResendInbox}><RefreshCw className="h-4 w-4 mr-2" />Actualiser</Button>
+                    </div>
+                    <CardDescription>Réponses entrantes capturées via le webhook email</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ScrollArea className="h-[600px]">
+                      <div className="space-y-3">
+                        {resendInbox.length === 0 ? (
+                          <p className="text-muted-foreground text-center py-10">Aucun message reçu</p>
+                        ) : resendInbox.map((m: any) => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={async () => {
+                              setSelectedEmail(m);
+                              setEmailReply("");
+                              if (!m.is_read) {
+                                await supabase.from("inbox_emails").update({ is_read: true }).eq("id", m.id);
+                                setResendInbox((prev) => prev.map((x) => x.id === m.id ? { ...x, is_read: true } : x));
+                              }
+                            }}
+                            className={`w-full text-left p-4 rounded-lg border hover:bg-muted/50 transition ${!m.is_read ? "bg-primary/5 border-primary/30 font-medium" : ""}`}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <div>
+                                <p className="font-medium text-sm">{m.from_name ? `${m.from_name} <${m.from_email}>` : m.from_email}</p>
+                                <p className="text-xs text-muted-foreground">{m.subject || "(sans sujet)"}</p>
+                              </div>
+                              <p className="text-xs text-muted-foreground">{format(new Date(m.received_at), "d MMM yyyy HH:mm", { locale: enUS })}</p>
+                            </div>
+                            <p className="text-sm whitespace-pre-wrap line-clamp-2 text-muted-foreground">{m.body_text || m.body_html?.replace(/<[^>]+>/g, "") || ""}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Sent Resend */}
+              <TabsContent value="sent">
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2"><Send className="h-5 w-5" />Boîte d'envoi Resend</CardTitle>
+                      <Button variant="outline" size="sm" onClick={loadResendSent} disabled={isLoadingResend}>
+                        <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingResend ? "animate-spin" : ""}`} />Actualiser
+                      </Button>
+                    </div>
+                    <CardDescription>Emails envoyés via Resend</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ScrollArea className="h-[600px]">
+                      {resendSent.length === 0 ? (
+                        <p className="text-muted-foreground text-center py-10">
+                          {isLoadingResend ? "Chargement..." : "Cliquez sur Actualiser pour charger les emails envoyés"}
+                        </p>
+                      ) : (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Date</TableHead>
+                              <TableHead>Destinataire</TableHead>
+                              <TableHead>Sujet</TableHead>
+                              <TableHead>Statut</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {resendSent.map((email: any) => (
+                              <TableRow key={email.id}>
+                                <TableCell className="text-xs">{email.created_at ? format(new Date(email.created_at), "d MMM HH:mm", { locale: enUS }) : "—"}</TableCell>
+                                <TableCell className="text-sm">{Array.isArray(email.to) ? email.to.join(", ") : email.to}</TableCell>
+                                <TableCell className="text-sm">{email.subject}</TableCell>
+                                <TableCell><Badge variant="outline">{email.last_event || "sent"}</Badge></TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </ScrollArea>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Compose */}
+              <TabsContent value="compose">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><Plus className="h-5 w-5" />Composer un email</CardTitle>
+                    <CardDescription>Sélectionnez un ou plusieurs utilisateurs comme destinataires</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <Label className="mb-2 block">Destinataires ({composeRecipients.length} sélectionnés)</Label>
+                      <Input
+                        placeholder="Rechercher un utilisateur..."
+                        value={userSearch}
+                        onChange={(e) => setUserSearch(e.target.value)}
+                        className="mb-2"
+                      />
+                      <div className="flex gap-2 mb-2">
+                        <Button size="sm" variant="outline" onClick={() => {
+                          const filtered = allUsers.filter(u => {
+                            const q = userSearch.toLowerCase();
+                            return !q || (u.email?.toLowerCase().includes(q) || u.full_name?.toLowerCase().includes(q));
+                          });
+                          setComposeRecipients(filtered.map(u => u.email).filter(Boolean) as string[]);
+                        }}>Tout sélectionner (filtré)</Button>
+                        <Button size="sm" variant="ghost" onClick={() => setComposeRecipients([])}>Tout désélectionner</Button>
+                      </div>
+                      <ScrollArea className="h-[250px] border rounded-lg p-2">
+                        <div className="space-y-1">
+                          {allUsers
+                            .filter(u => {
+                              const q = userSearch.toLowerCase();
+                              return !q || (u.email?.toLowerCase().includes(q) || u.full_name?.toLowerCase().includes(q));
+                            })
+                            .map((u) => {
+                              const checked = composeRecipients.includes(u.email);
+                              return (
+                                <label key={u.id} className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 cursor-pointer text-sm">
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={(e) => {
+                                      if (e.target.checked) setComposeRecipients([...composeRecipients, u.email]);
+                                      else setComposeRecipients(composeRecipients.filter(r => r !== u.email));
+                                    }}
+                                  />
+                                  <span className="font-medium">{u.full_name || "—"}</span>
+                                  <span className="text-muted-foreground">{u.email}</span>
+                                </label>
+                              );
+                            })}
+                        </div>
+                      </ScrollArea>
+                    </div>
+                    <div>
+                      <Label className="mb-2 block">Sujet</Label>
+                      <Input value={composeSubject} onChange={(e) => setComposeSubject(e.target.value)} placeholder="Sujet de l'email" />
+                    </div>
+                    <div>
+                      <Label className="mb-2 block">Message</Label>
+                      <RichTextEditor
+                        value={composeBody}
+                        onChange={setComposeBody}
+                        placeholder="Votre message..."
+                        minHeight={240}
+                        attachments={composeAttachments}
+                        onAttachmentsChange={setComposeAttachments}
+                      />
+                    </div>
+                    <Button onClick={handleSendCompose} disabled={isComposing || composeRecipients.length === 0}>
+                      <Send className="h-4 w-4 mr-2" />
+                      {isComposing ? "Envoi..." : `Envoyer à ${composeRecipients.length} destinataire(s)`}
+                    </Button>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
           </TabsContent>
 
           {/* Subscribers Tab */}
@@ -1129,6 +1436,133 @@ const SuperAdmin = () => {
           </TabsContent>
         </div>
       </Tabs>
+
+      {/* Email read & reply dialog */}
+      <Dialog open={!!selectedEmail} onOpenChange={(open) => { if (!open) { setSelectedEmail(null); setEmailReply(""); setReplyAttachments([]); } }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-base">{selectedEmail?.subject || "(sans sujet)"}</DialogTitle>
+            <DialogDescription className="text-xs">
+              De: {selectedEmail?.from_name ? `${selectedEmail.from_name} <${selectedEmail.from_email}>` : selectedEmail?.from_email}
+              {" · "}
+              {selectedEmail?.received_at && format(new Date(selectedEmail.received_at), "d MMM yyyy HH:mm", { locale: enUS })}
+            </DialogDescription>
+          </DialogHeader>
+          <Tabs value={emailViewMode} onValueChange={(v) => setEmailViewMode(v as any)} className="flex-1 flex flex-col min-h-0">
+            <TabsList className="w-fit">
+              <TabsTrigger value="preview">Aperçu</TabsTrigger>
+              <TabsTrigger value="html" disabled={!selectedEmail?.body_html}>Code HTML</TabsTrigger>
+              <TabsTrigger value="text" disabled={!selectedEmail?.body_text}>Texte brut</TabsTrigger>
+            </TabsList>
+            <TabsContent value="preview" className="flex-1 mt-2">
+              <ScrollArea className="h-[40vh] border rounded-md p-4 bg-white">
+                {selectedEmail?.body_html ? (
+                  <iframe
+                    title="Email preview"
+                    sandbox=""
+                    className="w-full h-full min-h-[35vh] border-0 bg-white"
+                    srcDoc={selectedEmail.body_html}
+                  />
+                ) : (
+                  <p className="text-sm whitespace-pre-wrap">{selectedEmail?.body_text || "(vide)"}</p>
+                )}
+              </ScrollArea>
+            </TabsContent>
+            <TabsContent value="html" className="flex-1 mt-2">
+              <div className="relative h-[40vh]">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="absolute top-2 right-2 z-10"
+                  onClick={() => {
+                    navigator.clipboard.writeText(selectedEmail?.body_html || "");
+                    toast({ title: "HTML copié" });
+                  }}
+                >
+                  Copier
+                </Button>
+                <ScrollArea className="h-full border rounded-md bg-muted/30">
+                  <pre className="text-xs p-4 whitespace-pre-wrap break-all font-mono">{selectedEmail?.body_html || ""}</pre>
+                </ScrollArea>
+              </div>
+            </TabsContent>
+            <TabsContent value="text" className="flex-1 mt-2">
+              <ScrollArea className="h-[40vh] border rounded-md p-4 bg-muted/20">
+                <pre className="text-sm whitespace-pre-wrap font-sans">{selectedEmail?.body_text || ""}</pre>
+              </ScrollArea>
+            </TabsContent>
+          </Tabs>
+          <div className="space-y-2 pt-2">
+            <Label className="text-sm">Répondre à {selectedEmail?.from_email}</Label>
+            <RichTextEditor
+              value={emailReply}
+              onChange={setEmailReply}
+              placeholder="Tapez votre réponse..."
+              minHeight={180}
+              attachments={replyAttachments}
+              onAttachmentsChange={setReplyAttachments}
+            />
+            <div className="flex justify-between items-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  if (!selectedEmail) return;
+                  await supabase.from("inbox_emails").delete().eq("id", selectedEmail.id);
+                  setResendInbox((prev) => prev.filter((x) => x.id !== selectedEmail.id));
+                  setSelectedEmail(null);
+                  toast({ title: "Supprimé" });
+                }}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />Supprimer
+              </Button>
+              <Button
+                disabled={!emailReply.replace(/<[^>]+>/g, "").trim() || isSendingEmailReply}
+                onClick={async () => {
+                  if (!selectedEmail || !emailReply.replace(/<[^>]+>/g, "").trim()) return;
+                  setIsSendingEmailReply(true);
+                  try {
+                    const subject = selectedEmail.subject?.startsWith("Re:") ? selectedEmail.subject : `Re: ${selectedEmail.subject || "Votre message"}`;
+                    const html = `<div style="font-family:-apple-system,sans-serif;line-height:1.6;color:#333;max-width:600px;">
+                      <div>${emailReply}</div>
+                      <hr style="margin:24px 0;border:none;border-top:1px solid #eee;">
+                      <div style="font-size:12px;color:#888;">
+                        <p>Le ${format(new Date(selectedEmail.received_at), "d MMM yyyy HH:mm", { locale: enUS })}, ${selectedEmail.from_email} a écrit :</p>
+                        <blockquote style="border-left:3px solid #ddd;padding-left:12px;color:#666;">
+                          ${(selectedEmail.body_text || selectedEmail.body_html?.replace(/<[^>]+>/g, "") || "").slice(0, 1000).replace(/</g, "&lt;").replace(/\n/g, "<br>")}
+                        </blockquote>
+                      </div>
+                    </div>`;
+                    const encodedAttachments = await Promise.all(
+                      replyAttachments.map(async (f) => {
+                        const buf = await f.arrayBuffer();
+                        let binary = "";
+                        const bytes = new Uint8Array(buf);
+                        for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+                        return { filename: f.name, content: btoa(binary), content_type: f.type || "application/octet-stream" };
+                      })
+                    );
+                    const { error } = await supabase.functions.invoke("send-email", {
+                      body: { type: "custom", to: selectedEmail.from_email, subject, html, message: emailReply, attachments: encodedAttachments },
+                    });
+                    if (error) throw error;
+                    toast({ title: "Réponse envoyée ✅" });
+                    setEmailReply("");
+                    setReplyAttachments([]);
+                    setSelectedEmail(null);
+                  } catch (e: any) {
+                    toast({ title: "Erreur d'envoi", description: e.message, variant: "destructive" });
+                  } finally {
+                    setIsSendingEmailReply(false);
+                  }
+                }}
+              >
+                <Send className="h-4 w-4 mr-2" />{isSendingEmailReply ? "Envoi..." : "Envoyer"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

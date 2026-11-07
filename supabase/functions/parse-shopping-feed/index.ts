@@ -33,10 +33,8 @@ serve(async (req) => {
       title: p.title || "Untitled Product",
       description: p.description || null,
       price: p.price ? parseFloat(p.price.replace(/[^0-9.]/g, "")) : null,
-      sale_price: p.sale_price ? parseFloat(p.sale_price.replace(/[^0-9.]/g, "")) : null,
       currency: p.currency || "EUR",
       image_url: p.image_link || null,
-      additional_images: p.additional_image_links?.length ? p.additional_image_links : null,
       product_url: p.link || null,
       brand: p.brand || null,
       category: p.product_type || p.google_product_category || null,
@@ -46,19 +44,12 @@ serve(async (req) => {
       mpn: p.mpn || null,
       feed_item_id: p.id || null,
       language: language || "fr",
-      // status is deliberately omitted: the column defaults to 'imported'
-      // for a genuinely new row, but on an upsert-triggered UPDATE (product
-      // already enriched/published from a previous sync) including it here
-      // would silently reset status back to 'imported' on every re-sync.
+      status: "imported",
     }));
 
-    // Upsert on (project_id, feed_item_id) so re-syncing a feed updates
-    // existing products instead of inserting duplicates every time. Rows
-    // with no feed_item_id (id missing from the feed) always insert fresh
-    // since NULL never conflicts — same as before for that edge case.
     const { data, error } = await supabase
       .from("shopping_products")
-      .upsert(productsToInsert, { onConflict: "project_id,feed_item_id" })
+      .insert(productsToInsert)
       .select("id");
 
     if (error) throw error;
@@ -96,7 +87,7 @@ function parseGoogleMerchantFeed(xml: string): any[] {
     // Extract standard Google Merchant fields
     const fields = [
       "id", "title", "description", "link", "image_link",
-      "price", "sale_price", "brand", "gtin", "mpn", "condition",
+      "price", "brand", "gtin", "mpn", "condition",
       "availability", "product_type", "google_product_category",
     ];
     for (const field of fields) {
@@ -107,24 +98,11 @@ function parseGoogleMerchantFeed(xml: string): any[] {
         product[field] = fieldMatch[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1").trim();
       }
     }
-    // additional_image_link can appear multiple times per item — a single
-    // fieldRegex.exec() (like the loop above) only ever captures the first.
-    const extraImageRegex = /<(?:g:)?additional_image_link[^>]*>([\s\S]*?)<\/(?:g:)?additional_image_link>/gi;
-    const extraImages: string[] = [];
-    let extraImageMatch;
-    while ((extraImageMatch = extraImageRegex.exec(itemXml)) !== null) {
-      const url = extraImageMatch[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1").trim();
-      if (url) extraImages.push(url);
-    }
-    if (extraImages.length) product.additional_image_links = extraImages;
     // Extract currency from price
     if (product.price) {
       const currencyMatch = product.price.match(/[A-Z]{3}/);
       if (currencyMatch) product.currency = currencyMatch[0];
       product.price = product.price.replace(/[^0-9.]/g, "");
-    }
-    if (product.sale_price) {
-      product.sale_price = product.sale_price.replace(/[^0-9.]/g, "");
     }
     if (product.title) products.push(product);
   }

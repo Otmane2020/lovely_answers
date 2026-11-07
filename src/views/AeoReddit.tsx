@@ -1,4 +1,5 @@
 "use client";
+import { Helmet } from "react-helmet-async";
 import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { SubscriptionGate } from "@/components/aeo/SubscriptionGate";
@@ -185,6 +186,14 @@ export default function AeoReddit() {
 
   return (
     <DashboardLayout>
+      <Helmet>
+        <title>Reddit Engagement — AutoPilot Geo</title>
+        <meta name="description" content="Find high-value Reddit threads and generate human-like replies that drive qualified traffic to your brand." />
+        <meta property="og:title" content="Reddit Engagement — AutoPilot Geo" />
+        <meta property="og:description" content="Find high-value Reddit threads and generate human-like replies that drive qualified traffic to your brand." />
+        <link rel="canonical" href="https://autopilotgeo.com/reddit" />
+        <meta property="og:url" content="https://autopilotgeo.com/reddit" />
+      </Helmet>
       <SubscriptionGate title="Unlock Reddit Engagement" description="Find high-value Reddit threads and generate human-like replies that drive traffic to your brand.">
       <div className="max-w-4xl mx-auto space-y-6">
         <PageHeader
@@ -198,13 +207,13 @@ export default function AeoReddit() {
           iconTo="to-red-500"
         >
           <Button variant="outline" onClick={refreshPosts} disabled={loading}><RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />Refresh</Button>
-          <Button onClick={generateAllReplies} disabled={loading} className="bg-[#1a2058] hover:bg-[#232c66] text-white"><Sparkles className="w-4 h-4 mr-2" />Generate All</Button>
+          <Button onClick={generateAllReplies} disabled={loading} className="bg-[hsl(222,47%,11%)] hover:bg-[hsl(222,47%,15%)] text-white"><Sparkles className="w-4 h-4 mr-2" />Generate All</Button>
         </PageHeader>
 
         <Card className="p-4 border-primary/20 bg-primary/5">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[#1a2058] flex items-center justify-center"><Shield className="w-5 h-5 text-white" /></div>
+              <div className="w-10 h-10 rounded-xl bg-[hsl(222,47%,11%)] flex items-center justify-center"><Shield className="w-5 h-5 text-white" /></div>
               <div><h3 className="font-semibold text-foreground">Brand Visibility: {activeProject?.brand_name || "Not set"}</h3><p className="text-sm text-muted-foreground">{visibilityMode === "stealth" && "0% brand mentions in comments"}{visibilityMode === "soft" && "~15% soft brand mentions (safe)"}{visibilityMode === "profile-only" && "Brand in Reddit bio only (recommended)"}</p></div>
             </div>
             <Select value={visibilityMode} onValueChange={(v) => setVisibilityMode(v as VisibilityMode)}><SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="stealth"><div className="flex items-center gap-2"><EyeOff className="w-4 h-4" /><span>Stealth (0%)</span></div></SelectItem><SelectItem value="soft"><div className="flex items-center gap-2"><Eye className="w-4 h-4" /><span>Soft (15%)</span></div></SelectItem><SelectItem value="profile-only"><div className="flex items-center gap-2"><User className="w-4 h-4" /><span>Profile Only</span></div></SelectItem></SelectContent></Select>
@@ -213,11 +222,11 @@ export default function AeoReddit() {
         </Card>
 
         <div className="grid grid-cols-3 lg:grid-cols-6 gap-4">
-          <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-[#1a2058] flex items-center justify-center"><Sparkles className="w-5 h-5 text-white" /></div><div><p className="text-2xl font-bold">{aeoCount}</p><p className="text-xs text-muted-foreground">AEO</p></div></div></Card>
-          <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-[#1a2058] flex items-center justify-center"><MapPin className="w-5 h-5 text-white" /></div><div><p className="text-2xl font-bold">{localCount}</p><p className="text-xs text-muted-foreground">Local</p></div></div></Card>
-          <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-[#1a2058] flex items-center justify-center"><FileText className="w-5 h-5 text-white" /></div><div><p className="text-2xl font-bold">{seoCount}</p><p className="text-xs text-muted-foreground">SEO</p></div></div></Card>
-          <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-[#1a2058] flex items-center justify-center"><MessageCircle className="w-5 h-5 text-white" /></div><div><p className="text-2xl font-bold">{posts.length}</p><p className="text-xs text-muted-foreground">Opportunities</p></div></div></Card>
-          <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-[#1a2058] flex items-center justify-center"><Zap className="w-5 h-5 text-white" /></div><div><p className="text-2xl font-bold">{posts.filter(p => p.suggestedComment).length}</p><p className="text-xs text-muted-foreground">Replies</p></div></div></Card>
+          <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-[hsl(222,47%,11%)] flex items-center justify-center"><Sparkles className="w-5 h-5 text-white" /></div><div><p className="text-2xl font-bold">{aeoCount}</p><p className="text-xs text-muted-foreground">AEO</p></div></div></Card>
+          <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-[hsl(222,47%,11%)] flex items-center justify-center"><MapPin className="w-5 h-5 text-white" /></div><div><p className="text-2xl font-bold">{localCount}</p><p className="text-xs text-muted-foreground">Local</p></div></div></Card>
+          <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-[hsl(222,47%,11%)] flex items-center justify-center"><FileText className="w-5 h-5 text-white" /></div><div><p className="text-2xl font-bold">{seoCount}</p><p className="text-xs text-muted-foreground">SEO</p></div></div></Card>
+          <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-[hsl(222,47%,11%)] flex items-center justify-center"><MessageCircle className="w-5 h-5 text-white" /></div><div><p className="text-2xl font-bold">{posts.length}</p><p className="text-xs text-muted-foreground">Opportunities</p></div></div></Card>
+          <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-[hsl(222,47%,11%)] flex items-center justify-center"><Zap className="w-5 h-5 text-white" /></div><div><p className="text-2xl font-bold">{posts.filter(p => p.suggestedComment).length}</p><p className="text-xs text-muted-foreground">Replies</p></div></div></Card>
           <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center"><TrendingUp className="w-5 h-5 text-white" /></div><div><p className="text-2xl font-bold">{posts.filter(p => p.trending).length}</p><p className="text-xs text-muted-foreground">Trending</p></div></div></Card>
         </div>
 

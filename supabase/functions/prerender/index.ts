@@ -53,7 +53,7 @@ function buildFullHtml(options: {
     h1 { font-size: 2em; line-height: 1.2; margin-bottom: 0.5em; }
     h2 { font-size: 1.5em; margin-top: 1.5em; }
     p { line-height: 1.7; margin-bottom: 1em; }
-    a { color: #2e3a8c; }
+    a { color: #7c3aed; }
     nav a { margin-right: 1em; }
     .meta { color: #666; font-size: 0.9em; margin-bottom: 2em; }
     footer { border-top: 1px solid #eee; margin-top: 3em; padding-top: 1em; font-size: 0.85em; color: #666; }

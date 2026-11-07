@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable/index";
 import { toast } from "sonner";
 
 declare global {
@@ -78,9 +78,8 @@ export function GoogleOneTap() {
       // Instead of handling the credential directly,
       // we trigger Lovable's managed OAuth flow
       try {
-        const { error } = await supabase.auth.signInWithOAuth({
-          provider: "google",
-          options: { redirectTo: `${window.location.origin}/auth` },
+        const { error } = await lovable.auth.signInWithOAuth("google", {
+          redirect_uri: `${window.location.origin}/auth`,
         });
         if (error) {
           toast.error("Erreur de connexion Google");

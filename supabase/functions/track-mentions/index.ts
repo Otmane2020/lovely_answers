@@ -16,126 +16,32 @@ Deno.serve(async (req) => {
   }
 
   try {
-    let body: any = {}
-    try {
-      body = await req.json()
-    } catch {
-      body = {}
-    }
-    const { project_id } = body
+    const { project_id } = await req.json()
 
-    // This function was only ever reachable via the manual "Run first
-    // check" button (project_id required) — nothing scheduled it, so the
-    // AI Mentions metric stayed at 0 for every project until someone
-    // clicked that button by hand. No project_id (the cron path, same
-    // convention as check-planning-completeness/daily-content-rotation)
-    // now runs it for every active project.
     if (!project_id) {
-      const { data: projects } = await supabase
-        .from('projects')
-        .select('id')
-        .eq('is_active', true)
-
-      const results: { projectId: string; ok: boolean; error?: string }[] = []
-      for (const p of projects || []) {
-        try {
-          await runForProject(p.id)
-          results.push({ projectId: p.id, ok: true })
-        } catch (err) {
-          console.error(`[track-mentions] Failed for project ${p.id}:`, err)
-          results.push({ projectId: p.id, ok: false, error: String(err) })
-        }
-        await sleep(1000)
-      }
-
-      const succeeded = results.filter((r) => r.ok).length
-      return new Response(JSON.stringify({
-        success: true,
-        processed: results.length,
-        succeeded,
-        failed: results.length - succeeded,
-        results,
-      }), {
+      return new Response(JSON.stringify({ error: 'project_id required' }), {
+        status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    const result = await runForProject(project_id)
-    return new Response(JSON.stringify(result), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  } catch (error) {
-    console.error('Track mentions error:', error)
-    return new Response(JSON.stringify({ error: String(error) }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  }
-})
-
-async function runForProject(project_id: string) {
     const { data: project } = await supabase
       .from('projects')
       .select('*')
       .eq('id', project_id)
       .single()
 
-    if (!project) {
-      throw new Error('Project not found')
-    }
-
-    let { data: queries } = await supabase
+    const { data: queries } = await supabase
       .from('tracked_queries')
       .select('*')
       .eq('project_id', project_id)
       .eq('is_active', true)
 
-    // Nothing to check yet is a normal state for a brand-new project, not an
-    // error — nowhere in the app lets someone add a tracked query by hand,
-    // so without this "Run the first check" would 404 forever. Seed a small
-    // default set from the project's own name/category instead. Sticking to
-    // chatgpt/claude (routed through OpenRouter, already confirmed working)
-    // rather than perplexity/gemini/bing, which need their own API keys
-    // that aren't necessarily configured.
-    if (!queries?.length) {
-      const brand = project.brand_name || project.name
-      const category = (project.business_type || 'business').toLowerCase()
-
-      // Real research (DataForSEO, via keyword-research / analyze-competitors,
-      // both triggered post-payment) beats generic guesses when it exists —
-      // tracking what people actually search for is the whole point.
-      const { data: topKeywords } = await supabase
-        .from('keywords')
-        .select('keyword')
-        .eq('project_id', project_id)
-        .order('search_volume', { ascending: false, nullsFirst: false })
-        .limit(2)
-
-      const competitors: string[] = Array.isArray(project.competitors) ? project.competitors.slice(0, 1) : []
-
-      const defaultQueries = [
-        ...(topKeywords || []).map((k: any) => k.keyword).filter(Boolean),
-        ...competitors.map((c: string) => `${brand} vs ${c} — which is better?`),
-        `Is ${brand} a good choice?`,
-        `What is ${brand}?`,
-      ].slice(0, topKeywords?.length ? 4 : 3)
-      if (!defaultQueries.length) defaultQueries.push(`Best ${category} recommendations`)
-
-      const seedRows = defaultQueries.flatMap((query) =>
-        ['chatgpt', 'claude'].map((platform) => ({
-          project_id,
-          query,
-          platform,
-          category: 'discovery',
-          is_active: true,
-        }))
-      )
-      const { data: inserted, error: seedError } = await supabase
-        .from('tracked_queries')
-        .upsert(seedRows, { onConflict: 'project_id,query,platform', ignoreDuplicates: true })
-        .select('*')
-      if (seedError) throw seedError
-      queries = inserted && inserted.length > 0 ? inserted : seedRows
+    if (!project || !queries?.length) {
+      return new Response(JSON.stringify({ error: 'Project or queries not found' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
     const brandNames = project.brand_names?.length
@@ -158,13 +64,22 @@ async function runForProject(project_id: string) {
     await computeVisibilityScores(project_id)
 
     const succeeded = results.filter(r => r.status === 'fulfilled').length
-    return {
+    return new Response(JSON.stringify({
       success: true,
       processed: results.length,
       succeeded,
-      failed: results.length - succeeded,
-    }
-}
+      failed: results.length - succeeded
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  } catch (error) {
+    console.error('Track mentions error:', error)
+    return new Response(JSON.stringify({ error: String(error) }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+})
 
 async function trackQuery(query: any, projectId: string, brandNames: string[], competitors: string[]) {
   let rawResponse: string
@@ -178,14 +93,6 @@ async function trackQuery(query: any, projectId: string, brandNames: string[], c
       break
     case 'bing':
       rawResponse = await queryBing(query.query)
-      break
-    case 'chatgpt':
-    case 'openai':
-      rawResponse = await queryViaOpenRouter(query.query, 'openai/gpt-4o')
-      break
-    case 'claude':
-    case 'anthropic':
-      rawResponse = await queryViaOpenRouter(query.query, 'anthropic/claude-3.5-sonnet')
       break
     default:
       throw new Error(`Unknown platform: ${query.platform}`)
@@ -271,33 +178,6 @@ async function queryBing(query: string): Promise<string> {
     .join('\n') ?? ''
 }
 
-// ChatGPT and Claude have no direct case here — OPENAI_API_KEY and
-// ANTHROPIC_API_KEY are never configured anywhere in this project. Routed
-// through OpenRouter instead, the same gateway already used everywhere else
-// in this codebase (analyze-website, generate-30-gso-contents, sentiment
-// analysis below), so this works with the secret that's already set rather
-// than requiring two more to be added.
-async function queryViaOpenRouter(query: string, model: string): Promise<string> {
-  const apiKey = Deno.env.get('OPENROUTER_API_KEY')
-  if (!apiKey) throw new Error('OPENROUTER_API_KEY not set')
-
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: 'user', content: query }],
-      max_tokens: 1024,
-    }),
-  })
-  if (!res.ok) throw new Error(`OpenRouter ${model} error: ${res.status} ${await res.text()}`)
-  const data = await res.json()
-  return data.choices?.[0]?.message?.content ?? ''
-}
-
 // --- PARSER ---
 
 function parseMention(response: string, brandNames: string[], competitors: string[]) {
@@ -346,7 +226,7 @@ async function analyzeSentiment(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemma-4-31b-it:free',
+        model: 'google/gemini-2.0-flash-exp:free',
         max_tokens: 60,
         messages: [
           {

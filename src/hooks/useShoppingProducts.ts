@@ -52,15 +52,11 @@ export function useShoppingProducts() {
     queryKey: ["shopping-products", project?.id],
     queryFn: async () => {
       if (!project) return [];
-      // Unlike useArticles/useAnswers, this had no cap at all — fetched
-      // every row unbounded, which is exactly wrong for a catalog that can
-      // legitimately hold thousands of products from a real feed.
       const { data, error } = await supabase
         .from("shopping_products")
         .select("*")
         .eq("project_id", project.id)
-        .order("created_at", { ascending: false })
-        .limit(1000);
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return data as ShoppingProduct[];
     },

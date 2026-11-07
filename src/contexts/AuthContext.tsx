@@ -1,5 +1,5 @@
 "use client";
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -18,34 +18,147 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const redirectInFlight = useRef(false);
+
+  const getFallbackTarget = (authUser: User) => {
+    const createdAt = new Date(authUser.created_at).getTime();
+    const isLikelyNewUser = Number.isFinite(createdAt) && Date.now() - createdAt < 10 * 60 * 1000;
+    return isLikelyNewUser ? "/wizard" : "/dashboard";
+  };
+
+  const redirectAfterAuth = async (authUser: User, source = "auth") => {
+    if (typeof window === "undefined") return;
+
+    const path = window.location.pathname.replace(/\/+$/, "") || "/";
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const searchParams = new URLSearchParams(window.location.search);
+    const isRecovery = hashParams.get("type") === "recovery" || searchParams.get("type") === "recovery";
+    const intent = searchParams.get("intent") || sessionStorage.getItem("post_oauth_intent");
+    const next = searchParams.get("next");
+
+    if (isRecovery || !["/auth", "/signup"].includes(path)) return;
+    if (redirectInFlight.current) return;
+    redirectInFlight.current = true;
+
+    if (window.location.hash) {
+      window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+    }
+    sessionStorage.removeItem("post_oauth_intent");
+
+    if (next?.startsWith("/")) {
+      console.log("[AuthContext] Post-auth next redirect →", next, { source });
+      window.location.replace(next);
+      return;
+    }
+
+    if (intent === "signup") {
+      console.log("[AuthContext] OAuth signup redirect → /checkout", { source });
+      window.location.replace("/checkout?plan=pro&cycle=annual");
+      return;
+    }
+
+    try {
+      const projectLookup = supabase
+        .from("projects")
+        .select("id")
+        .eq("user_id", authUser.id)
+        .limit(1);
+
+      const timeout = new Promise<{ data: null; error: Error }>((resolve) => {
+        window.setTimeout(() => resolve({ data: null, error: new Error("project lookup timeout") }), 1500);
+      });
+
+      const { data: projects, error } = await Promise.race([projectLookup, timeout]);
+
+      if (error) throw error;
+
+      const target = projects && projects.length > 0 ? "/dashboard" : "/wizard";
+      console.log("[AuthContext] Post-auth redirect →", target, { source });
+      window.location.replace(target);
+    } catch (e) {
+      console.error("[AuthContext] Post-auth redirect query error:", e);
+      window.location.replace(getFallbackTarget(authUser));
+    }
+  };
 
   useEffect(() => {
-    // The client's own detectSessionInUrl (on by default) already parses
-    // the OAuth redirect — whether it comes back as a #access_token hash
-    // (implicit flow) or a ?code= query param (PKCE) — exchanges it, fires
-    // SIGNED_IN below, and strips it from the URL. A second manual parser
-    // used to live here, reading only the hash form and calling setSession
-    // itself: redundant with the SDK's own handling, blind to the PKCE
-    // form entirely, and a race against it for the hash form (whichever
-    // strips the URL first leaves the other with nothing to read) — the
-    // likely cause of Google sign-in occasionally never reaching this
-    // listener at all, leaving the user stuck without a redirect to
-    // onboarding or the dashboard.
+    // Set up auth state listener FIRST.
+    // Supabase-js auto-detects OAuth tokens in URL hash (detectSessionInUrl=true by default)
+    // and fires SIGNED_IN automatically — we don't need to manually call setSession.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        console.log("[AuthContext] event:", event, "hasSession:", !!session);
         setSession(session);
         setUser(session?.user ?? null);
         setIsLoading(false);
+
+        if ((event === "SIGNED_IN" || event === "INITIAL_SESSION") && session?.user) {
+          setTimeout(() => {
+            redirectAfterAuth(session.user, event);
+          }, 0);
+        }
       }
     );
 
+    const forceOAuthHashRedirect = async () => {
+      if (typeof window === "undefined") return;
+      const path = window.location.pathname.replace(/\/+$/, "") || "/";
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const searchParams = new URLSearchParams(window.location.search);
+      const isRecovery = hashParams.get("type") === "recovery" || searchParams.get("type") === "recovery";
+      const hasOAuthTokens = hashParams.has("access_token") && hashParams.has("refresh_token");
+
+      if (isRecovery || !hasOAuthTokens || !["/auth", "/signup"].includes(path)) return;
+
+      console.log("[AuthContext] OAuth hash detected on auth page");
+      const { data: current } = await supabase.auth.getSession();
+      if (current.session?.user) {
+        await redirectAfterAuth(current.session.user, "hash-existing-session");
+        return;
+      }
+
+      const { data, error } = await supabase.auth.setSession({
+        access_token: hashParams.get("access_token")!,
+        refresh_token: hashParams.get("refresh_token")!,
+      });
+
+      if (error) {
+        console.error("[AuthContext] OAuth hash session error:", error);
+        return;
+      }
+
+      if (data.session?.user) {
+        await redirectAfterAuth(data.session.user, "hash-set-session");
+      }
+    };
+
+    forceOAuthHashRedirect();
+
+    // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setIsLoading(false);
+      if (session?.user) {
+        redirectAfterAuth(session.user, "getSession");
+      }
     });
 
-    return () => subscription.unsubscribe();
+    const safetyTimer = window.setTimeout(async () => {
+      if (typeof window === "undefined" || redirectInFlight.current) return;
+      const path = window.location.pathname.replace(/\/+$/, "") || "/";
+      if (!["/auth", "/signup"].includes(path)) return;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        console.log("[AuthContext] Safety redirect →", getFallbackTarget(session.user));
+        window.location.replace(getFallbackTarget(session.user));
+      }
+    }, 2200);
+
+    return () => {
+      window.clearTimeout(safetyTimer);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -73,13 +186,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Phone saved via user_metadata during signup
 
-    // Trigger AI welcome call + WhatsApp + notification email (fire & forget)
+    // Trigger AI welcome call + WhatsApp (fire & forget)
     if (!error && data.user) {
       const country = await fetch("https://ipapi.co/country/")
         .then(r => r.text())
         .catch(() => "");
-
-      // Trigger welcome automation
       fetch("https://apg-welcome-automation.oben-rockman.workers.dev", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -88,28 +199,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email,
           phone: phone || "",
           country,
-        }),
-      }).catch(() => {});
-
-      // Send notification email to admin
-      fetch("https://ywrpxptnmdmjljvbkwyt.supabase.co/functions/v1/send-email", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || ""}`,
-        },
-        body: JSON.stringify({
-          type: "custom",
-          to: "oben.rockman@gmail.com",
-          subject: `New signup: ${fullName || email}`,
-          html: `
-            <p><strong>New user registration on AutoPilot Geo</strong></p>
-            <p><strong>Name:</strong> ${fullName || "Not provided"}</p>
-            <p><strong>Email:</strong> ${email}</p>
-            <p><strong>Phone:</strong> ${phone || "Not provided"}</p>
-            <p><strong>Country:</strong> ${country || "Not detected"}</p>
-            <p><strong>Signup time:</strong> ${new Date().toISOString()}</p>
-          `,
         }),
       }).catch(() => {});
     }

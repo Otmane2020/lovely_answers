@@ -1,5 +1,4 @@
 "use client";
-import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,67 +17,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useSearchParams, useRouter } from "next/navigation";
+
 
 export default function AeoLocal() {
   const { business, isLoading, isInitialLoading, selectBusiness, clearBusiness } = useLocalBusiness();
   const { project } = useActiveProject();
-  const { isConnected, connectGMB, isLoading: gmbLoading } = useGoogleBusiness();
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const pathname = typeof window !== "undefined" ? window.location.pathname : "/local";
-  const [isExchanging, setIsExchanging] = useState(false);
-
-  // Handle GMB OAuth callback
-  useEffect(() => {
-    const code = searchParams.get("code");
-    const stateParam = searchParams.get("state");
-
-    if (code && stateParam && project?.id && !isExchanging) {
-      handleGmbCallback(code, stateParam);
-    }
-  }, [searchParams, project?.id]);
-
-  const handleGmbCallback = async (code: string, stateParam: string) => {
-    setIsExchanging(true);
-    try {
-      let parsed: any = {};
-      try {
-        parsed = JSON.parse(atob(stateParam));
-      } catch {}
-
-      if (parsed.type !== "gmb") {
-        setIsExchanging(false);
-        return;
-      }
-
-      const redirectUri = `${window.location.origin}/local`;
-
-      const { data, error } = await supabase.functions.invoke("gmb-oauth-token", {
-        body: {
-          code,
-          redirectUri,
-          projectId: project?.id || parsed.projectId,
-        },
-      });
-
-      if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || "Failed to connect");
-
-      toast.success("Google My Business connected!");
-
-      // Clean URL params
-      router.push(pathname);
-      // Reload to reflect connection
-      window.location.reload();
-    } catch (err: any) {
-      console.error("GMB callback error:", err);
-      toast.error(err.message || "Failed to connect Google My Business");
-      router.push(pathname);
-    } finally {
-      setIsExchanging(false);
-    }
-  };
+  const { isConnected, disconnectGMB, isLoading: gmbLoading } = useGoogleBusiness();
 
   const handleConnectGMB = async () => {
     try {
@@ -88,9 +32,12 @@ export default function AeoLocal() {
         return;
       }
 
+      // GMB OAuth is whitelisted on /integrations only — remember to come back here
+      try { sessionStorage.setItem("gmb_return_to", "/local"); } catch {}
+
       const { data, error } = await supabase.functions.invoke("gmb-oauth-url", {
         body: {
-          redirectUri: `${window.location.origin}/local`,
+          redirectUri: `${window.location.origin}/integrations`,
           projectId: project?.id,
         },
       });
@@ -106,19 +53,6 @@ export default function AeoLocal() {
     }
   };
 
-  if (isExchanging) {
-    return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center py-20">
-          <div className="text-center space-y-3">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-            <p className="font-medium">Connecting Google My Business...</p>
-            <p className="text-sm text-muted-foreground">Please wait while we finalize the connection</p>
-          </div>
-        </div>
-      </DashboardLayout>
-    );
-  }
 
   return (
     <DashboardLayout>
@@ -154,10 +88,15 @@ export default function AeoLocal() {
                 </div>
               </div>
               {isConnected ? (
-                <Badge variant="outline" className="bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800 gap-1.5 shrink-0">
-                  <Check className="h-3 w-3" />
-                  Connected
-                </Badge>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Badge variant="outline" className="bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800 gap-1.5">
+                    <Check className="h-3 w-3" />
+                    Connected
+                  </Badge>
+                  <Button variant="outline" size="sm" onClick={disconnectGMB} className="text-destructive border-destructive/30 hover:bg-destructive/10">
+                    Disconnect
+                  </Button>
+                </div>
               ) : (
                 <Button
                   onClick={handleConnectGMB}

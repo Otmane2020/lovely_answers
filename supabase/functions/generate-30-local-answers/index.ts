@@ -1,11 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
-import { chatCompletion } from "../_shared/ai-call.ts";
+import { reviewWithClaude } from "../_shared/claude-review.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
 
 /* =======================
    HELPERS
@@ -314,6 +316,7 @@ async function generateLocalAnswer(
   businessContext: string,
   businessName: string,
   language: string,
+  apiKey: string,
 ): Promise<{ answer: string; bullets: string[] }> {
   const lang = language === "fr" ? "French" : "English";
   const blueprint = getCategoryBlueprint(category, language);
@@ -344,26 +347,35 @@ Return ONLY valid JSON:
   "bullets": ["Key info 1...", "Key info 2...", "Key info 3...", "Key info 4..."]
 }`;
 
-  const result = await chatCompletion({
-    temperature: 0.45,
-    max_tokens: 2000, // ← CRITIQUE : assez pour 300-450 mots en markdown
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ],
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-flash",
+      temperature: 0.45,
+      max_tokens: 2000, // ← CRITIQUE : assez pour 300-450 mots en markdown
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+    }),
   });
 
-  const raw = result.choices?.[0]?.message?.content ?? "";
+  const json = await res.json();
+  const raw = json?.choices?.[0]?.message?.content ?? "";
   if (!raw) throw new Error("Empty AI response");
 
   const parsed = safeParseJSON<{ answer: string; bullets: string[] }>(raw);
 
-  // Fallback si trop court
+  // NO FALLBACK - reject too-short AI output instead of padding it
   const words = countWords(parsed.answer || "");
   if (words < 80) {
-    console.warn(`[generate-30-local] Short answer (${words} words) for: "${question}"`);
-    parsed.answer = `## ${question}\n\n${parsed.answer}\n\n*Pour plus d'informations, contactez directement ${businessName}.*`;
+    throw new Error(`AI returned too-short answer (${words} words) for "${question}" — refusing to publish placeholder content`);
   }
+
 
   return parsed;
 }
@@ -453,7 +465,20 @@ serve(async (req) => {
           contextString,
           businessName,
           language,
+          OPENROUTER_API_KEY!,
         );
+
+        // ── Claude review (post-generation polish) ──
+        if (generated.answer) {
+          const reviewed = await reviewWithClaude({
+            content: generated.answer,
+            contentType: "local_answer",
+            language,
+            brand: businessName,
+            question,
+          });
+          generated.answer = reviewed.content;
+        }
 
         const words = countWords(generated.answer);
         const score = computeLocalScore(generated.answer, businessName);

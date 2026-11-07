@@ -69,7 +69,7 @@ export default function AeoArticles() {
           iconFrom="from-blue-500"
           iconTo="to-indigo-600"
         >
-          <Button onClick={() => router.push("/aeo/answers")} className="bg-[#1a2058] hover:bg-[#232c66] text-white">
+          <Button onClick={() => router.push("/aeo/answers")} className="bg-[hsl(222,47%,11%)] hover:bg-[hsl(222,47%,15%)] text-white">
             <Plus className="w-4 h-4 mr-2" />Create article
           </Button>
         </PageHeader>
@@ -88,7 +88,7 @@ export default function AeoArticles() {
             <FileText className="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-base sm:text-lg font-semibold mb-2">No articles found</h3>
             <p className="text-sm text-muted-foreground mb-4">Create your first AI-optimized article</p>
-            <Button onClick={() => router.push("/aeo/answers")} className="bg-[#1a2058] hover:bg-[#232c66] text-white">
+            <Button onClick={() => router.push("/aeo/answers")} className="bg-[hsl(222,47%,11%)] hover:bg-[hsl(222,47%,15%)] text-white">
               <Plus className="w-4 h-4 mr-2" />Create article
             </Button>
           </Card>

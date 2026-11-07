@@ -8,18 +8,23 @@ import { ContentQualitySection } from "./ContentQualitySection";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { useGeneration } from "@/contexts/GenerationContext";
 
 interface AutoPublishSettingsProps {
   projectId: string;
+  onSettingsChange?: (s: { frequency: string; enabled: boolean }) => void;
+  onFrequencyChanged?: () => void | Promise<void>;
 }
 
-export function AutoPublishSettings({ projectId }: AutoPublishSettingsProps) {
+export function AutoPublishSettings({ projectId, onSettingsChange, onFrequencyChanged }: AutoPublishSettingsProps) {
+  const { startGeneration, stopGeneration, setGenerationProgress } = useGeneration();
   const [autoPublishEnabled, setAutoPublishEnabled] = useState(true);
   const [humanReviewEnabled, setHumanReviewEnabled] = useState(false);
   const [publishHour, setPublishHour] = useState("08");
   const [publishPeriod, setPublishPeriod] = useState<"AM" | "PM">("AM");
   const [timezone, setTimezone] = useState("Europe/Paris");
-  const [frequency, setFrequency] = useState("3x_week");
+  const [frequency, setFrequency] = useState("daily");
+  const [savedFrequency, setSavedFrequency] = useState("daily");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -38,9 +43,9 @@ export function AutoPublishSettings({ projectId }: AutoPublishSettingsProps) {
 
   // Recommended: 3x/week (Mon/Wed/Fri) — best balance of quality vs volume
   const frequencies = [
-  { value: "3x_week", label: "3x/week ✓" },
+  { value: "daily", label: "Daily ✓" },
+  { value: "3x_week", label: "3x/week" },
   { value: "2x_week", label: "2x/week" },
-  { value: "daily", label: "Daily" },
   { value: "weekly", label: "Weekly" },
   { value: "monthly", label: "Monthly" }];
 
@@ -76,7 +81,9 @@ export function AutoPublishSettings({ projectId }: AutoPublishSettingsProps) {
           setPublishHour(hour12.toString().padStart(2, "0"));
           setPublishPeriod(period);
           setTimezone((data as any).timezone || "Europe/Paris");
-          setFrequency((data as any).publish_frequency || "3x_week");
+          const loadedFreq = (data as any).publish_frequency || "daily";
+          setFrequency(loadedFreq);
+          setSavedFrequency(loadedFreq);
         }
       } catch (error) {
         console.error("Error loading settings:", error);
@@ -110,8 +117,26 @@ export function AutoPublishSettings({ projectId }: AutoPublishSettingsProps) {
 
       if (error) throw error;
 
+      const frequencyChanged = frequency !== savedFrequency;
+      setSavedFrequency(frequency);
       toast.success("Settings saved");
       setHasChanges(false);
+
+      if (frequencyChanged) {
+        const t = toast.loading("Replanification en cours…");
+        try {
+          const { data, error: refillError } = await supabase.functions.invoke("daily-planning-fill", {
+            body: { projectId, days: 31, maxDaysToFill: 30 },
+          });
+          if (refillError) throw refillError;
+          if ((data as any)?.success === false) throw new Error((data as any)?.error || "Planning fill failed");
+          toast.success("Calendrier mis à jour", { id: t });
+          await onFrequencyChanged?.();
+        } catch (e) {
+          console.error("Refill error:", e);
+          toast.error("Replanification échouée", { id: t });
+        }
+      }
     } catch (error) {
       console.error("Error saving settings:", error);
       toast.error("Failed to save settings");
@@ -124,6 +149,59 @@ export function AutoPublishSettings({ projectId }: AutoPublishSettingsProps) {
     setter(value);
     setHasChanges(true);
   };
+
+  // Frequency changes apply immediately (no Save button needed)
+  const handleFrequencyChange = async (newFrequency: string) => {
+    if (newFrequency === frequency) return;
+    setFrequency(newFrequency);
+    if (!projectId) return;
+
+    setIsSaving(true);
+    startGeneration(`Applying ${newFrequency.replace("_", " ")} schedule… (30–60s)`);
+    setGenerationProgress(10);
+    const interval = setInterval(() => {
+      setGenerationProgress((p) => (p < 90 ? p + 2 : p));
+    }, 1000);
+
+    try {
+      const { error } = await supabase
+        .from("project_settings")
+        .upsert(
+          {
+            project_id: projectId,
+            publish_frequency: newFrequency,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "project_id" }
+        );
+      if (error) throw error;
+
+      setSavedFrequency(newFrequency);
+
+      const { data, error: refillError } = await supabase.functions.invoke("daily-planning-fill", {
+        body: { projectId, days: 31, maxDaysToFill: 30 },
+      });
+      if (refillError) throw refillError;
+      if ((data as any)?.success === false) throw new Error((data as any)?.error || "Planning fill failed");
+
+      toast.success("Planning updated");
+      await onFrequencyChanged?.();
+    } catch (e) {
+      console.error("Frequency change error:", e);
+      toast.error("Content is being prepared. Please try again in a moment.");
+    } finally {
+      clearInterval(interval);
+      stopGeneration();
+      setIsSaving(false);
+    }
+  };
+
+  // Live-emit frequency + enabled state so the calendar can preview
+  useEffect(() => {
+    if (isLoading) return;
+    onSettingsChange?.({ frequency, enabled: autoPublishEnabled });
+  }, [frequency, autoPublishEnabled, isLoading, onSettingsChange]);
+
 
   const hours = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, "0"));
 
@@ -168,7 +246,7 @@ export function AutoPublishSettings({ projectId }: AutoPublishSettingsProps) {
       {/* Frequency — default 3x/week (Mon/Wed/Fri) recommended by Google HCU */}
       <div className="flex items-center gap-2">
         <Calendar className="h-4 w-4 text-muted-foreground" />
-        <Select value={frequency} onValueChange={handleChange(setFrequency)}>
+        <Select value={frequency} onValueChange={handleFrequencyChange} disabled={isSaving}>
           <SelectTrigger className="w-[120px] h-9">
             <SelectValue />
           </SelectTrigger>

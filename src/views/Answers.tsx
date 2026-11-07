@@ -11,24 +11,28 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Filter, Plus, Eye, Pencil, Newspaper, ExternalLink, Copy, Globe, Loader2, RefreshCw, Zap, Send, FileText, Clock, MessageSquare } from "lucide-react";
+import { Search, Filter, Plus, Eye, Pencil, Newspaper, ExternalLink, Copy, Globe, Loader2, RefreshCw, Zap, Send, FileText, Clock, MessageSquare, Lock } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuCheckboxItem } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useAnswers, useToggleAnswerPublic } from "@/hooks/useAnswers";
 import { usePublishAnswer } from "@/hooks/usePublishAnswer";
 import { useActiveProject } from "@/hooks/useProjects";
+import { sanitizeHtml } from "@/lib/sanitize";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { CmsConnectPopup } from "@/components/CmsConnectPopup";
 import { PageHeader } from "@/components/PageHeader";
 import { useSubscriptionContext } from "@/contexts/SubscriptionContext";
+import { useUsage } from "@/hooks/useUsage";
+
 import { ContentUpgradeDialog } from "@/components/aeo/ContentUpgradeDialog";
 import chatGptLogo from "@/assets/chatgpt-logo.png";
 import chatGptIcon from "@/assets/chatgpt-icon.png";
 
 const platforms = ["ChatGPT", "Gemini", "Claude", "Perplexity", "Copilot"];
+const LOCKED_ANSWER_TEXT = "Content locked — subscribe to unlock.";
 
 interface Article {
   id: string;
@@ -80,6 +84,28 @@ export default function Answers() {
   const [generatingArticleId, setGeneratingArticleId] = useState<string | null>(null);
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   const { isSubscribed } = useSubscriptionContext();
+  const { canGenerateArticle, articlesLimit, articlesThisMonth, refetch: refetchUsage } = useUsage();
+
+
+  const isAnswerLocked = (answer: typeof answers[0]) => !answer.answer || answer.answer === LOCKED_ANSWER_TEXT;
+
+  useEffect(() => {
+    const unlockLockedContent = async () => {
+      if (!isSubscribed || answers.length === 0 || !answers.some(isAnswerLocked)) return;
+
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        await supabase.functions.invoke("unlock-articles", {
+          headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined,
+        });
+        window.setTimeout(() => refetch(), 6000);
+      } catch (error) {
+        console.error("Error unlocking paid content:", error);
+      }
+    };
+
+    unlockLockedContent();
+  }, [isSubscribed, answers, refetch]);
 
   // Fetch articles
   useEffect(() => {
@@ -159,6 +185,7 @@ export default function Answers() {
 
   const handleViewAnswer = (answer: typeof answers[0]) => {
     if (!isSubscribed) {setShowUpgradeDialog(true);return;}
+    if (isAnswerLocked(answer)) {toast.info("Content is being prepared. Please refresh in a moment.");return;}
     setViewingAnswer(answer);
   };
 
@@ -171,6 +198,14 @@ export default function Answers() {
       toast.error("No active project");
       return;
     }
+    if (!canGenerateArticle) {
+      toast.error(
+        `Monthly article limit reached (${articlesThisMonth}/${articlesLimit ?? "∞"}). Upgrade to keep generating.`,
+        { action: { label: "Upgrade", onClick: () => router.push("/pricing") } }
+      );
+      return;
+    }
+
 
     setGeneratingArticleId(answerId);
     try {
@@ -281,10 +316,18 @@ export default function Answers() {
 
   const regenerateAllAnswers = async () => {
     if (!user) return;
+    if (!canGenerateArticle) {
+      toast.error(
+        `Monthly article limit reached (${articlesThisMonth}/${articlesLimit ?? "∞"}). Upgrade to keep generating.`,
+        { action: { label: "Upgrade", onClick: () => router.push("/pricing") } }
+      );
+      return;
+    }
 
     setRegeneratingAll(true);
     setIsGeneratingWithProgress(true);
     setGenerationProgress(0);
+
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -359,10 +402,18 @@ export default function Answers() {
 
   const generate30Answers = async () => {
     if (!user) return;
+    if (!canGenerateArticle) {
+      toast.error(
+        `Monthly article limit reached (${articlesThisMonth}/${articlesLimit ?? "∞"}). Upgrade to keep generating.`,
+        { action: { label: "Upgrade", onClick: () => router.push("/pricing") } }
+      );
+      return;
+    }
 
     setGenerating30(true);
     setIsGeneratingWithProgress(true);
     setGenerationProgress(0);
+
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -531,9 +582,21 @@ export default function Answers() {
           {/* Answers Tab Content */}
           <TabsContent value="answers" className="space-y-4 mt-4">
             {filteredAnswers.map((answer, index) =>
-            <GlassCard key={answer.id} hover className="p-4 sm:p-6 cursor-pointer" onClick={() => handleViewAnswer(answer)}>
+             <GlassCard key={answer.id} hover className="p-4 sm:p-6 cursor-pointer" onClick={() => handleViewAnswer(answer)}>
                 <div className="flex items-start gap-4">
-                  <ScoreRing score={answer.score ?? 0} size="sm" />
+                  {(!isSubscribed && index !== 0) || isAnswerLocked(answer) ? (
+                    isSubscribed ? (
+                      <div className="w-12 h-12 rounded-full border-2 border-primary/30 bg-primary/5 flex items-center justify-center text-primary shrink-0" title="Preparing content…">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      </div>
+                    ) : (
+                      <div className="w-12 h-12 rounded-full border-2 border-muted flex items-center justify-center text-muted-foreground shrink-0" title="Locked — subscribe to unlock">
+                        <Lock className="w-4 h-4" />
+                      </div>
+                    )
+                  ) : (
+                    <ScoreRing score={answer.score ?? 0} size="sm" />
+                  )}
                   <div className="flex-1 min-w-0 space-y-3">
                     <div className="flex items-start justify-between gap-3">
                       <h3 className="font-semibold text-sm sm:text-base leading-snug">{answer.question}</h3>
@@ -544,7 +607,7 @@ export default function Answers() {
                     </div>
                     {!isSubscribed && index === 0 ?
                   <p className="text-sm text-muted-foreground line-clamp-1">{answer.answer}</p> :
-                  isSubscribed ?
+                   isSubscribed && !isAnswerLocked(answer) ?
                   <p className="text-sm text-muted-foreground line-clamp-3">{answer.answer}</p> :
                   null}
                     <div className="flex flex-wrap gap-2">
@@ -565,13 +628,13 @@ export default function Answers() {
 
                     }
                       <Button variant="ghost" size="sm" onClick={() => handleEditAnswer(answer.id)} className="gap-1"><Pencil className="h-3 w-3" />Edit</Button>
-                      <Button variant="ghost" size="sm" onClick={() => {
+                      {!isAnswerLocked(answer) && <Button variant="ghost" size="sm" onClick={() => {
                       const content = `Question: ${answer.question}\n\nAnswer: ${answer.answer}`;
                       navigator.clipboard.writeText(content);
                       toast.success("Answer copied to clipboard!");
                     }} className="gap-1">
                         <Copy className="h-3 w-3" />Copy Answer
-                      </Button>
+                      </Button>}
                       {answer.has_article &&
                     <Button variant="ghost" size="sm" onClick={async () => {
                       const { data: article } = await supabase.
@@ -817,7 +880,7 @@ export default function Answers() {
             {viewingArticle?.html_content ?
             <div
               className="prose prose-sm max-w-none dark:prose-invert"
-              dangerouslySetInnerHTML={{ __html: viewingArticle.html_content }} /> :
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(viewingArticle.html_content) }} /> :
 
             viewingArticle?.content ?
             <div className="whitespace-pre-wrap text-sm">{viewingArticle.content}</div> :

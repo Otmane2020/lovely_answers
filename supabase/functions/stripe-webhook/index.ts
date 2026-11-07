@@ -2,9 +2,17 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
-const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-  apiVersion: "2025-08-27.basil",
-});
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, stripe-signature, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
+
+const stripeKey = Deno.env.get("STRIPE_SECRET_KEY") || "";
+if (stripeKey.startsWith("pk_") || (!stripeKey.startsWith("sk_") && !stripeKey.startsWith("rk_"))) {
+  console.error("[STRIPE-WEBHOOK] Invalid STRIPE_SECRET_KEY: expected sk_* or rk_*, never pk_*");
+}
+
+const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
 
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL") ?? "",
@@ -17,24 +25,60 @@ const logStep = (step: string, details?: any) => {
   console.log(`[STRIPE-WEBHOOK] ${step}${detailsStr}`);
 };
 
+const hasConfirmedPaymentMethod = (subscription: any) => Boolean(
+  subscription.default_payment_method ||
+  subscription.default_source ||
+  subscription.pending_setup_intent?.status === "succeeded"
+);
+
+// Price → plan map (keep in sync with src/lib/stripe-products.ts)
+const PRICE_MAP: Record<string, { plan: "starter" | "pro" | "agency"; cycle: "monthly" | "annual"; sites: number; articles: number }> = {
+  "price_1TZI35Efti9t9nN9yj0tBl4c": { plan: "starter", cycle: "monthly", sites: 1, articles: 10 },
+  "price_1TZIB3Efti9t9nN9A4NxsNsg": { plan: "starter", cycle: "annual",  sites: 1, articles: 10 },
+  "price_1TZIBYEfti9t9nN9lG9JGwUa": { plan: "pro",     cycle: "monthly", sites: 3, articles: 30 },
+  "price_1TZIBfEfti9t9nN9ZYClUCvF": { plan: "pro",     cycle: "annual",  sites: 3, articles: 30 },
+  "price_1TZIBjEfti9t9nN9ToqTd8xu": { plan: "agency",  cycle: "monthly", sites: 10, articles: -1 },
+  "price_1TZIBnEfti9t9nN9fmZiURZR": { plan: "agency",  cycle: "annual",  sites: 10, articles: -1 },
+};
+
+
 serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
   const signature = req.headers.get("stripe-signature");
   const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
 
-  if (!signature) {
-    logStep("ERROR: No signature provided");
-    return new Response("No signature", { status: 400 });
-  }
-
+  // SECURITY: never accept events without a verified signature.
+  // Forged Stripe events can grant/revoke subscriptions.
   if (!webhookSecret) {
-    logStep("ERROR: STRIPE_WEBHOOK_SECRET not set");
-    return new Response("Webhook secret not configured", { status: 500 });
+    console.error("[stripe-webhook] STRIPE_WEBHOOK_SECRET is not configured — refusing request");
+    return new Response(JSON.stringify({ error: "Server misconfiguration" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  if (!signature) {
+    return new Response(JSON.stringify({ error: "Missing stripe-signature header" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   try {
     const body = await req.text();
-    // Use async version for Deno/Edge runtime
-    const event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
+
+    let event: Stripe.Event;
+    try {
+      event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
+    } catch (err) {
+      console.error("[stripe-webhook] Signature verification failed:", (err as Error).message);
+      return new Response(JSON.stringify({ error: "Invalid signature" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     logStep("Event received", { type: event.type, id: event.id });
 
@@ -65,13 +109,16 @@ serve(async (req) => {
     }
 
     return new Response(JSON.stringify({ received: true }), {
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
     logStep("ERROR processing webhook", { error: errorMessage });
-    return new Response(`Webhook error: ${errorMessage}`, { status: 400 });
+    return new Response(JSON.stringify({ error: errorMessage }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 400,
+    });
   }
 });
 
@@ -158,8 +205,8 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
 
   if (!profile) return;
 
-  const isActive = subscription.status === "active" || subscription.status === "trialing";
-  const creditsTotal = subscription.status === "trialing" ? 50 : (isActive ? 500 : 0);
+  const isActive = subscription.status === "active" || (subscription.status === "trialing" && hasConfirmedPaymentMethod(subscription));
+  const creditsTotal = subscription.status === "trialing" && isActive ? 50 : (isActive ? 500 : 0);
 
   await supabaseAdmin.from("credits").upsert({
     user_id: profile.id,
@@ -168,7 +215,38 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
     updated_at: new Date().toISOString()
   }, { onConflict: "user_id" });
 
+
   logStep("Credits updated", { userId: profile.id, credits: creditsTotal });
+
+  // Upsert subscriptions row (plan/cycle/limits)
+  try {
+    const priceId = (subscription.items?.data?.[0]?.price?.id as string) || "";
+    const mapped = PRICE_MAP[priceId];
+    const trialEnd = (subscription as any).trial_end
+      ? new Date((subscription as any).trial_end * 1000).toISOString()
+      : null;
+    const periodEnd = (subscription as any).current_period_end
+      ? new Date((subscription as any).current_period_end * 1000).toISOString()
+      : null;
+
+    await supabaseAdmin.from("subscriptions").upsert({
+      user_id: profile.id,
+      stripe_customer_id: subscription.customer as string,
+      stripe_subscription_id: subscription.id,
+      plan: mapped?.plan ?? "starter",
+      cycle: mapped?.cycle ?? "monthly",
+      status: subscription.status,
+      trial_end: trialEnd,
+      current_period_end: periodEnd,
+      sites_limit: mapped?.sites ?? 1,
+      articles_limit: mapped?.articles ?? 10,
+      cancel_at_period_end: !!(subscription as any).cancel_at_period_end,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id" });
+    logStep("Subscription upserted", { plan: mapped?.plan, cycle: mapped?.cycle, status: subscription.status });
+  } catch (subErr) {
+    logStep("Error upserting subscription", { error: String(subErr) });
+  }
 
   // AUTO-UNLOCK: When subscription becomes active, unlock all locked articles
   if (isActive) {
@@ -179,6 +257,8 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
         .select("id")
         .eq("user_id", profile.id)
         .limit(1);
+
+
 
       if (projects && projects.length > 0) {
         const projectId = projects[0].id;
@@ -227,73 +307,43 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
       logStep("Error in auto-unlock process", { error: String(unlockErr) });
     }
 
-    // Competitor and keyword research (DataForSEO — real money) only ever
-    // runs once payment is actually confirmed, not during onboarding — a
-    // signup that never converts should never cost a DataForSEO call. This
-    // fires on every subscription.updated event though, so it has to be
-    // idempotent: skip if this project already has keywords stored.
+    // SHOPIFY: if user came via Shopify OAuth, kick off product import + AI generation
     try {
-      await triggerCompetitorAnalysisOnce(profile.id);
-    } catch (compErr) {
-      logStep("Error triggering competitor analysis", { error: String(compErr) });
+      const { data: install } = await supabaseAdmin
+        .from("shopify_installs")
+        .select("shop")
+        .eq("user_id", profile.id)
+        .maybeSingle();
+      if (install?.shop) {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+        const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+        const auth = { "Content-Type": "application/json", "Authorization": `Bearer ${serviceRoleKey}` };
+        // 1) Import products (idempotent) + mark integration connected
+        const impRes = await fetch(`${supabaseUrl}/functions/v1/shopify-import-products`, {
+          method: "POST", headers: auth, body: JSON.stringify({ shop: install.shop, userId: profile.id }),
+        });
+        const impJson = await impRes.json().catch(() => ({}));
+        logStep("Shopify import triggered", impJson);
+        const pid = impJson?.projectId;
+        // 2) Fetch shop context (language, address, pages, product URLs)
+        if (pid) {
+          fetch(`${supabaseUrl}/functions/v1/shopify-fetch-context`, {
+            method: "POST", headers: auth, body: JSON.stringify({ shop: install.shop, userId: profile.id, projectId: pid }),
+          }).catch((e) => logStep("shopify-fetch-context trigger error", { error: String(e) }));
+          // 3) Flag onboarding as needed so ThankYou can redirect merchant to /wizard
+          await supabaseAdmin.from("projects").update({
+            needs_onboarding: true, source: "shopify_oauth",
+          }).eq("id", pid);
+          // 4) Generate AI for imported products + fill 30-day planning
+          fetch(`${supabaseUrl}/functions/v1/auto-generate-shopping`, {
+            method: "POST", headers: auth, body: JSON.stringify({ projectId: pid }),
+          }).catch((e) => logStep("auto-generate-shopping trigger error", { error: String(e) }));
+        }
+      }
+    } catch (shopErr) {
+      logStep("Shopify post-payment automation error", { error: String(shopErr) });
     }
   }
-}
-
-async function triggerCompetitorAnalysisOnce(userId: string) {
-  const { data: projects } = await supabaseAdmin
-    .from("projects")
-    .select("id, competitors, language, country")
-    .eq("user_id", userId)
-    .limit(1);
-
-  const project = projects?.[0];
-  if (!project) {
-    logStep("No project found for competitor analysis", { userId });
-    return;
-  }
-
-  const { count } = await supabaseAdmin
-    .from("keywords")
-    .select("id", { count: "exact", head: true })
-    .eq("project_id", project.id);
-
-  if (count && count > 0) {
-    logStep("Competitor analysis already run for project, skipping", { projectId: project.id });
-    return;
-  }
-
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-  const authHeaders = {
-    "Content-Type": "application/json",
-    "Authorization": `Bearer ${serviceRoleKey}`,
-  };
-
-  logStep("Triggering competitor + keyword research", { projectId: project.id });
-
-  const compRes = await fetch(`${supabaseUrl}/functions/v1/analyze-competitors`, {
-    method: "POST",
-    headers: authHeaders,
-    body: JSON.stringify({
-      projectId: project.id,
-      competitors: project.competitors ?? [],
-      language: project.language || "en",
-    }),
-  }).then((r) => r.json()).catch((e) => ({ error: String(e) }));
-  logStep("analyze-competitors result", compRes);
-
-  const kwRes = await fetch(`${supabaseUrl}/functions/v1/keyword-research`, {
-    method: "POST",
-    headers: authHeaders,
-    body: JSON.stringify({
-      projectId: project.id,
-      seedKeywords: [],
-      language: project.language || "en",
-      country: (project.country || "us").toLowerCase(),
-    }),
-  }).then((r) => r.json()).catch((e) => ({ error: String(e) }));
-  logStep("keyword-research result", kwRes);
 }
 
 async function handleSubscriptionCanceled(subscription: Stripe.Subscription) {
@@ -321,5 +371,12 @@ async function handleSubscriptionCanceled(subscription: Stripe.Subscription) {
     updated_at: new Date().toISOString()
   }, { onConflict: "user_id" });
 
+  // Mark subscription canceled
+  await supabaseAdmin
+    .from("subscriptions")
+    .update({ status: "canceled", updated_at: new Date().toISOString() })
+    .eq("user_id", profile.id);
+
   logStep("Credits reset for canceled subscription", { userId: profile.id });
 }
+

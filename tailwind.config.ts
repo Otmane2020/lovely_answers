@@ -50,24 +50,6 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // Legacy pages (About, Pricing, Blog, several Aeo* admin views, ...)
-        // use Tailwind's stock `violet-*` scale as their brand accent — a
-        // holdover from the old cyan/purple identity. Overriding the palette
-        // itself, rather than touching every one of those ~20 files' class
-        // names, retargets them all at once onto the v4 blue/navy brand:
-        // violet-500 (the most common shade in use) now IS the brand blue.
-        violet: {
-          50: "#eef0fb",
-          100: "#dde1f5",
-          200: "#b8c0e8",
-          300: "#8f9cd8",
-          400: "#6674b8",
-          500: "#2e3a8c",
-          600: "#232c66",
-          700: "#1a2058",
-          800: "#141a44",
-          900: "#0f1433",
-        },
       },
       borderRadius: {
         lg: "var(--radius)",

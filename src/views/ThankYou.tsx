@@ -1,10 +1,11 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { trackPurchase } from "@/lib/gtag-conversions";
 import { trackMetaPurchase } from "@/lib/meta-pixel";
 import { supabase } from "@/integrations/supabase/client";
+import { useSubscriptionContext } from "@/contexts/SubscriptionContext";
 import { AnimatedLogo } from "@/components/AnimatedLogo";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Loader2, ArrowRight } from "lucide-react";
@@ -12,8 +13,14 @@ import { CheckCircle2, Loader2, ArrowRight } from "lucide-react";
 export default function ThankYou() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { checkSubscription } = useSubscriptionContext();
   const [verified, setVerified] = useState<boolean | null>(null);
+  const [postPaymentReady, setPostPaymentReady] = useState(false);
+  const trackedRef = useRef(false);
   const sessionId = searchParams.get("session_id");
+  const subscriptionId = searchParams.get("subscription_id");
+  const setupIntent = searchParams.get("setup_intent");
+  const redirectStatus = searchParams.get("redirect_status");
 
   // Force light theme
   useEffect(() => {
@@ -21,49 +28,91 @@ export default function ThankYou() {
   }, []);
 
   useEffect(() => {
-    if (!sessionId) {
-      router.replace("/dashboard");
+    if (!sessionId && !subscriptionId) {
+      router.replace("/checkout");
       return;
     }
 
-    let tracked = false;
-
     const verify = async () => {
       try {
-        const { data, error } = await supabase.functions.invoke("verify-checkout-session", {
-          body: { session_id: sessionId },
-        });
-
-        if (error || !data?.paid) {
-          console.warn("[ThankYou] Payment not verified:", error);
+        if (subscriptionId && redirectStatus && redirectStatus !== "succeeded") {
           setVerified(false);
           return;
         }
 
-        setVerified(true);
+        if (subscriptionId && !setupIntent) {
+          setVerified(false);
+          return;
+        }
 
-        // Fire Google Ads conversion only once
-        if (!tracked) {
-          tracked = true;
-          const value = data.amount ? data.amount / 100 : 29;
-          trackPurchase(value, sessionId);
+        let data: any = null;
+        if (sessionId) {
+          const { data: verifyData, error } = await supabase.functions.invoke("verify-checkout-session", {
+            body: { session_id: sessionId },
+          });
+
+          if (error || !verifyData?.paid) {
+            console.warn("[ThankYou] Payment not verified:", error);
+            setVerified(false);
+            return;
+          }
+          data = verifyData;
+        }
+
+        // Trigger backend unlock immediately (verifies Stripe + unlocks articles/geo)
+        try {
+          await supabase.functions.invoke("verify-and-unlock-payment");
+        } catch (e) {
+          console.warn("[ThankYou] verify-and-unlock-payment failed:", e);
+        }
+
+        // Force-refresh subscription state with retries to overcome Stripe propagation lag.
+        let activeConfirmed = false;
+        for (let i = 0; i < 6; i++) {
+          try {
+            const active = await checkSubscription(subscriptionId || undefined);
+            if (active) {
+              activeConfirmed = true;
+              setVerified(true);
+              setPostPaymentReady(true);
+              break;
+            }
+          } catch {}
+          await new Promise((r) => setTimeout(r, i < 2 ? 1500 : 2500));
+        }
+
+        if (!activeConfirmed) {
+          const active = await checkSubscription(subscriptionId || undefined);
+          if (!active) {
+            setVerified(false);
+            return;
+          }
+          setVerified(true);
+          setPostPaymentReady(true);
+        }
+
+        if (!trackedRef.current) {
+          trackedRef.current = true;
+          const value = data?.amount ? data.amount / 100 : 29;
+          const transactionId = sessionId || setupIntent || subscriptionId || undefined;
+          trackPurchase(value, transactionId);
           // Second account purchase conversion (AW-17956394555)
           if (typeof window !== "undefined" && window.gtag) {
             window.gtag("event", "conversion", {
               send_to: "AW-17956394555/lC8cCNymrfkbELuso_JC",
               value: value,
               currency: "USD",
-              transaction_id: sessionId || "",
+              transaction_id: transactionId || "",
             });
           }
           // Tapfiliate trial conversion
-          if (typeof window !== "undefined" && (window as any).tap && data.customer_id) {
+          if (typeof window !== "undefined" && (window as any).tap && data?.customer_id) {
             (window as any).tap("trial", data.customer_id);
             console.log("[ThankYou] Tapfiliate trial fired:", data.customer_id);
           }
           // Meta Pixel — Subscribe + Purchase conversion
-          trackMetaPurchase(value, sessionId || undefined);
-          console.log("[ThankYou] Purchase conversion fired (both accounts):", { value, sessionId });
+          trackMetaPurchase(value, transactionId);
+          console.log("[ThankYou] Purchase conversion fired (both accounts):", { value, transactionId });
         }
       } catch (err) {
         console.error("[ThankYou] Verification error:", err);
@@ -72,7 +121,7 @@ export default function ThankYou() {
     };
 
     verify();
-  }, [sessionId, router]);
+  }, [sessionId, subscriptionId, setupIntent, redirectStatus, router, checkSubscription]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -107,15 +156,41 @@ export default function ThankYou() {
                   Payment confirmed! 🎉
                 </h1>
                 <p className="text-muted-foreground text-lg">
-                  Welcome to AutoPilot Geo. Your subscription is now active.
+                  {postPaymentReady ? "Your access is active and content generation has started." : "Welcome to AutoPilot Geo. Activating your access..."}
                 </p>
               </div>
               <Button
-                onClick={() => router.push("/dashboard")}
-                className="w-full h-14 text-lg font-semibold bg-gradient-to-r from-primary to-violet-500 hover:opacity-90 transition-opacity rounded-xl"
+                onClick={async () => {
+                  // Final refresh right before navigation to ensure no stale lock state
+                  try { await checkSubscription(); } catch {}
+                  const { data: { user } } = await supabase.auth.getUser();
+                  if (user) {
+                    // Shopify OAuth users → onboarding wizard (with prefill from shop)
+                    const { data: shopProj } = await supabase
+                      .from("projects")
+                      .select("id, needs_onboarding, source")
+                      .eq("user_id", user.id)
+                      .eq("needs_onboarding", true)
+                      .maybeSingle();
+                    if (shopProj?.needs_onboarding) {
+                      router.push(shopProj.source === "shopify_oauth" ? "/wizard?source=shopify" : "/wizard");
+                      return;
+                    }
+                    // Users without any project → wizard
+                    const { data: projects } = await supabase
+                      .from("projects").select("id").eq("user_id", user.id).limit(1);
+                    if (!projects || projects.length === 0) {
+                      router.push("/wizard");
+                      return;
+                    }
+                  }
+                  router.push("/dashboard");
+                }}
+                disabled={!postPaymentReady}
+                className="w-full h-14 text-lg font-semibold bg-gradient-to-r from-primary to-violet-500 hover:opacity-90 transition-opacity rounded-xl disabled:opacity-70"
               >
-                Go to Dashboard
-                <ArrowRight className="h-5 w-5 ml-2" />
+                {postPaymentReady ? "Continue setup" : "Unlocking your workspace..."}
+                {postPaymentReady ? <ArrowRight className="h-5 w-5 ml-2" /> : <Loader2 className="h-5 w-5 ml-2 animate-spin" />}
               </Button>
             </>
           )}

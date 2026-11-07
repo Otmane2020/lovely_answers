@@ -26,7 +26,7 @@ interface ScheduledItem {
   type: "answer" | "article" | "local" | "geo" | "shopping";
   origin: "AEO" | "Auto SEO" | "Local AEO" | "GEO" | "Shopping";
   date: Date;
-  status: "scheduled" | "published" | "draft";
+  status: "scheduled" | "published" | "draft" | "preview";
   publishedUrl?: string;
   publishedAt?: string | null;
   answer?: string;
@@ -35,10 +35,35 @@ interface ScheduledItem {
   aeoScore?: number | null;
   wordCount?: number | null;
   createdAt?: string | null;
+  isPreview?: boolean;
 }
 
 function getPublishStatus(input: { published_url?: string | null; published_at?: string | null }) {
   return input.published_url || input.published_at ? "published" : "scheduled";
+}
+
+function getArticlePublishedUrl(article: any, projectWebsiteUrl?: string | null) {
+  const linkedUrl = article.answers?.published_url;
+  if (linkedUrl) return linkedUrl;
+  if (article.status === "published" && article.slug) {
+    const baseUrl = projectWebsiteUrl || window.location.origin;
+    return `${baseUrl.replace(/\/+$/, "")}/blog/${article.slug}`;
+  }
+  return undefined;
+}
+
+// Mirrors backend `shouldPublishToday` in publish-scheduled-answers
+function matchesFrequency(date: Date, frequency: string): boolean {
+  const dow = date.getDay();
+  const dom = date.getDate();
+  switch (frequency) {
+    case "weekly": return dow === 1;
+    case "monthly": return dom === 1;
+    case "2x_week": return dow === 2 || dow === 4;
+    case "3x_week": return dow === 1 || dow === 3 || dow === 5;
+    case "daily":
+    default: return true;
+  }
 }
 
 export default function AeoPlanning() {
@@ -57,13 +82,16 @@ export default function AeoPlanning() {
   const canPublish = isSubscribed || canPublishFree;
   const [monthViewMode, setMonthViewMode] = useState<"calendar" | "list">("calendar");
   const [scheduledItems, setScheduledItems] = useState<ScheduledItem[]>([]);
+  const [queueItems, setQueueItems] = useState<ScheduledItem[]>([]);
+  const [liveFrequency, setLiveFrequency] = useState<string>("daily");
+  const [autoPublishOn, setAutoPublishOn] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState(true);
   const [publishingId, setPublishingId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedDayItems, setSelectedDayItems] = useState<ScheduledItem[]>([]);
   const [showDayPopup, setShowDayPopup] = useState(false);
   const [weekOffset, setWeekOffset] = useState(0);
-  const hasRunFill = useRef(false);
+  const hasRunFill = useRef<string | null>(null);
 
   const rangeStart = useMemo(() => {
     const d = new Date();
@@ -85,48 +113,73 @@ export default function AeoPlanning() {
 
   const rangeDays = useMemo(() => eachDayOfInterval({ start: rangeStart, end: rangeEnd }), [rangeStart, rangeEnd]);
 
+  // Keep every scheduled item at its real scheduled_date. Published items stay published;
+  // everything else is shown as "preview" so the user sees the full pipeline (AEO + GEO + Local + Shopping).
+  // We intentionally do NOT redistribute by `liveFrequency` here — that previously caused GEO/Local items
+  // to be dropped because AEO answers filled all the matching weekday slots first.
+  const publishedScheduled = useMemo(
+    () => scheduledItems.filter((i) => i.status === "published"),
+    [scheduledItems]
+  );
+  const previewItems = useMemo<ScheduledItem[]>(() => {
+    if (!autoPublishOn) return [];
+    return scheduledItems
+      .filter((i) => i.status !== "published")
+      .map((i) => ({ ...i, status: "preview" as const, isPreview: true }));
+  }, [scheduledItems, autoPublishOn]);
+
+  const allItems = useMemo(() => [...publishedScheduled, ...previewItems], [publishedScheduled, previewItems]);
+
+
+
+
   const getItemsForDate = (date: Date) => {
-    return scheduledItems.filter((item) => format(item.date, "yyyy-MM-dd") === format(date, "yyyy-MM-dd"));
+    return allItems.filter((item) => format(item.date, "yyyy-MM-dd") === format(date, "yyyy-MM-dd"));
   };
 
   const getUpcomingItems = () => {
-    return scheduledItems.filter((item) => item.date >= new Date()).sort((a, b) => a.date.getTime() - b.date.getTime());
+    return allItems.filter((item) => item.date >= new Date()).sort((a, b) => a.date.getTime() - b.date.getTime());
   };
 
+
   const fetchScheduledItems = async () => {
-    if (!project?.id) return;
+    if (!project?.id) return [];
     setIsLoading(true);
     try {
       const { data: answers } = await supabase.from("answers").select("id, question, scheduled_date, published_url, published_at, answer, score, high_citation, created_at").eq("project_id", project.id).not("scheduled_date", "is", null);
-      const { data: articles } = await supabase.from("articles").select("id, title, scheduled_date, aeo_score, word_count, created_at").eq("project_id", project.id).not("scheduled_date", "is", null);
+      const { data: articles } = await supabase.from("articles").select("id, title, scheduled_date, status, slug, aeo_score, word_count, created_at, answers:linked_answer_id(published_url, published_at)").eq("project_id", project.id).not("scheduled_date", "is", null);
       const { data: localAnswers } = await supabase.from("local_answers").select("id, question, scheduled_date, published_url, published_at, answer, score, created_at").eq("project_id", project.id).not("scheduled_date", "is", null);
       const { data: geoContents } = await supabase.from("geo_contents").select("id, title, topic, scheduled_date, published_url, published_at, content, score, created_at").eq("project_id", project.id).not("scheduled_date", "is", null);
       const items: ScheduledItem[] = [];
+      const pickDate = (published_at: string | null | undefined, scheduled_date: string) =>
+        new Date(published_at || scheduled_date);
       if (answers) {
         answers.forEach((a) => {
           if (a.scheduled_date) {
-            items.push({ id: a.id, title: a.question, type: "answer", origin: "AEO", date: new Date(a.scheduled_date), status: getPublishStatus(a), publishedUrl: a.published_url || undefined, publishedAt: a.published_at, answer: a.answer || undefined, score: a.score, highCitation: a.high_citation, createdAt: a.created_at });
+            items.push({ id: a.id, title: a.question, type: "answer", origin: "AEO", date: pickDate(a.published_at, a.scheduled_date), status: getPublishStatus(a), publishedUrl: a.published_url || undefined, publishedAt: a.published_at, answer: a.answer || undefined, score: a.score, highCitation: a.high_citation, createdAt: a.created_at });
           }
         });
       }
       if (articles) {
-        articles.forEach((art) => {
+        articles.forEach((art: any) => {
           if (art.scheduled_date) {
-            items.push({ id: art.id, title: art.title, type: "article", origin: "Auto SEO", date: new Date(art.scheduled_date), status: "scheduled", aeoScore: art.aeo_score, wordCount: art.word_count, createdAt: art.created_at });
+            const publishedUrl = getArticlePublishedUrl(art, project.website_url);
+            const publishedAt = art.answers?.published_at || null;
+            items.push({ id: art.id, title: art.title, type: "article", origin: "Auto SEO", date: pickDate(publishedAt, art.scheduled_date), status: art.status === "published" ? "published" : "scheduled", publishedUrl, publishedAt, aeoScore: art.aeo_score, wordCount: art.word_count, createdAt: art.created_at });
           }
         });
       }
       if (localAnswers) {
         localAnswers.forEach((la) => {
           if (la.scheduled_date) {
-            items.push({ id: la.id, title: la.question, type: "local", origin: "Local AEO", date: new Date(la.scheduled_date), status: getPublishStatus(la), publishedUrl: la.published_url || undefined, publishedAt: la.published_at, answer: la.answer || undefined, score: la.score, createdAt: la.created_at });
+            items.push({ id: la.id, title: la.question, type: "local", origin: "Local AEO", date: pickDate(la.published_at, la.scheduled_date), status: getPublishStatus(la), publishedUrl: la.published_url || undefined, publishedAt: la.published_at, answer: la.answer || undefined, score: la.score, createdAt: la.created_at });
           }
         });
       }
       if (geoContents) {
         geoContents.forEach((geo: any) => {
           if (geo.scheduled_date) {
-            items.push({ id: geo.id, title: geo.title || geo.topic, type: "geo", origin: "GEO", date: new Date(geo.scheduled_date), status: getPublishStatus(geo), publishedUrl: geo.published_url || undefined, publishedAt: geo.published_at, answer: geo.content || undefined, score: geo.score, createdAt: geo.created_at });
+            items.push({ id: geo.id, title: geo.title || geo.topic, type: "geo", origin: "GEO", date: pickDate(geo.published_at, geo.scheduled_date), status: getPublishStatus(geo), publishedUrl: geo.published_url || undefined, publishedAt: geo.published_at, answer: geo.content || undefined, score: geo.score, createdAt: geo.created_at });
           }
         });
       }
@@ -137,37 +190,187 @@ export default function AeoPlanning() {
           if (sp.scheduled_date) {
             const product = sp.shopping_products;
             const title = product?.ai_title || product?.title || "Product";
-            items.push({ id: sp.id, title, type: "shopping", origin: "Shopping", date: new Date(sp.scheduled_date), status: sp.published ? "published" : "scheduled", publishedAt: sp.published_at, score: product?.ai_score, createdAt: sp.scheduled_date });
+            items.push({ id: sp.id, title, type: "shopping", origin: "Shopping", date: pickDate(sp.published_at, sp.scheduled_date), status: sp.published ? "published" : "scheduled", publishedAt: sp.published_at, score: product?.ai_score, createdAt: sp.scheduled_date });
           }
         });
       }
+
       setScheduledItems(items);
+      return items;
     } catch (error) {
       console.error("Error fetching scheduled items:", error);
       toast.error("Failed to load scheduled items");
+      return [];
     } finally {
       setIsLoading(false);
     }
   };
 
+  const fetchQueue = async () => {
+    if (!project?.id) return;
+    try {
+      const items: ScheduledItem[] = [];
+      const { data: ans } = await supabase.from("answers")
+        .select("id, question, created_at")
+        .eq("project_id", project.id)
+        .is("scheduled_date", null)
+        .is("published_at", null)
+        .order("created_at", { ascending: true })
+        .limit(60);
+      ans?.forEach((a: any) => items.push({ id: `prev-a-${a.id}`, title: a.question, type: "answer", origin: "AEO", date: new Date(), status: "preview", createdAt: a.created_at, isPreview: true }));
+
+      const { data: arts } = await supabase.from("articles")
+        .select("id, title, created_at")
+        .eq("project_id", project.id)
+        .is("scheduled_date", null)
+        .order("created_at", { ascending: true })
+        .limit(60);
+      arts?.forEach((a: any) => items.push({ id: `prev-art-${a.id}`, title: a.title, type: "article", origin: "Auto SEO", date: new Date(), status: "preview", createdAt: a.created_at, isPreview: true }));
+
+      const { data: locals } = await supabase.from("local_answers")
+        .select("id, question, created_at")
+        .eq("project_id", project.id)
+        .is("scheduled_date", null)
+        .is("published_at", null)
+        .order("created_at", { ascending: true })
+        .limit(60);
+      locals?.forEach((a: any) => items.push({ id: `prev-l-${a.id}`, title: a.question, type: "local", origin: "Local AEO", date: new Date(), status: "preview", createdAt: a.created_at, isPreview: true }));
+
+      const { data: geos } = await supabase.from("geo_contents")
+        .select("id, title, topic, created_at")
+        .eq("project_id", project.id)
+        .is("scheduled_date", null)
+        .is("published_at", null)
+        .order("created_at", { ascending: true })
+        .limit(60);
+      geos?.forEach((g: any) => items.push({ id: `prev-g-${g.id}`, title: g.title || g.topic, type: "geo", origin: "GEO", date: new Date(), status: "preview", createdAt: g.created_at, isPreview: true }));
+
+      // Sort by created_at to mimic FIFO queue
+      items.sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
+      setQueueItems(items);
+    } catch (e) {
+      console.error("Error fetching queue:", e);
+    }
+  };
+
+  const markItemPublished = (itemId: string, publishedUrl?: string | null) => {
+    const publishedAt = new Date().toISOString();
+    const applyUpdate = (items: ScheduledItem[]) => items.map((entry) =>
+      entry.id === itemId
+        ? { ...entry, status: "published" as const, publishedUrl: publishedUrl || entry.publishedUrl, publishedAt, isPreview: false }
+        : entry
+    );
+    setScheduledItems(applyUpdate);
+    setSelectedDayItems(applyUpdate);
+  };
+
   useEffect(() => {
     fetchScheduledItems();
+    fetchQueue();
   }, [project?.id]);
+
+  useEffect(() => {
+    const ensurePlanningIsFilled = async () => {
+      if (!project?.id || hasRunFill.current === project.id) return;
+
+      const items = await fetchScheduledItems();
+      if (items.length > 0) {
+        hasRunFill.current = project.id;
+        return;
+      }
+
+      hasRunFill.current = project.id;
+      startGeneration("Auto-filling 30-day planning… (30–60s)");
+      setGenerationProgress(10);
+
+      // Slow visual progress so user knows the app is alive
+      const interval = setInterval(() => {
+        setGenerationProgress((p) => (p < 90 ? p + 2 : p));
+      }, 1000);
+
+      try {
+        const { data, error } = await supabase.functions.invoke("daily-planning-fill", {
+          body: { projectId: project.id, days: 31, maxDaysToFill: 30 },
+        });
+
+        if (error) throw error;
+        if (data?.success === false) {
+          throw new Error(data.error || "Planning fill failed");
+        }
+
+        await fetchScheduledItems();
+        await fetchQueue();
+        setGenerationMessage("Calendar updated");
+        toast.success("Calendar updated");
+      } catch (error) {
+        console.error("Initial planning fill error:", error);
+        toast.error("Content is being prepared. Please try again in a moment.");
+      } finally {
+        clearInterval(interval);
+        stopGeneration();
+      }
+    };
+
+    ensurePlanningIsFilled();
+  }, [project?.id]);
+
 
   const handlePublishNow = async (item: ScheduledItem) => {
     if (!project) return;
     setPublishingId(item.id);
     try {
       if (item.type === "answer") {
-        await publishAnswer.mutateAsync({ answerId: item.id, projectId: project.id });
-        toast.success("Answer published!");
+        const publishResult = await publishAnswer.mutateAsync({ answerId: item.id, projectId: project.id });
+        const url = publishResult?.publishedUrl || publishResult?.results?.find((r: any) => r.success && r.url)?.url;
+        markItemPublished(item.id, url || null);
+        if (url) {
+          toast.success("Answer published!", {
+            action: { label: "Check live →", onClick: () => window.open(url, "_blank") },
+            duration: 10000,
+          });
+        } else {
+          toast.success("Answer published!");
+        }
+      } else if (item.type === "geo") {
+        const { data, error } = await supabase.functions.invoke("publish-geo-content", {
+          body: { geoContentId: item.id, projectId: project.id },
+        });
+        if (error) throw error;
+        if (data?.success === false) throw new Error(data?.error || "Publish failed");
+        const url = data?.publishedUrl;
+        markItemPublished(item.id, url);
+        if (url) {
+          toast.success("GEO content published!", {
+            action: { label: "Check live →", onClick: () => window.open(url, "_blank") },
+            duration: 10000,
+          });
+        } else {
+          toast.success("GEO content published!");
+        }
+      } else if (item.type === "article" || item.type === "local" || item.type === "shopping") {
+        const targetDate = format(item.date, "yyyy-MM-dd");
+        const { data, error } = await supabase.functions.invoke("publish-scheduled-answers", {
+          body: { forceToday: true, projectId: project.id, targetDate },
+        });
+        if (error) throw error;
+        if (data?.success === false) throw new Error(data?.error || "Publish failed");
+        const result = data?.results?.find((r: any) => r.id === item.id && r.success) || data?.results?.find((r: any) => r.success);
+        markItemPublished(item.id, result?.url && result.url !== "internal" ? result.url : null);
+        if (result?.url && result.url !== "internal") {
+          toast.success("Published!", {
+            action: { label: "Check live →", onClick: () => window.open(result.url, "_blank") },
+            duration: 10000,
+          });
+        } else {
+          toast.success("Published!");
+        }
       } else {
-        toast.info("Article publishing coming soon");
+        toast.info("Nothing to publish for this item");
       }
       await fetchScheduledItems();
     } catch (error) {
       console.error("Error publishing:", error);
-      toast.error("Failed to publish");
+      toast.error(error instanceof Error ? error.message : "Failed to publish");
     } finally {
       setPublishingId(null);
     }
@@ -229,7 +432,18 @@ export default function AeoPlanning() {
                 <span>Generating content...</span>
               </div>
             )}
-            {project && <AutoPublishSettings projectId={project.id} />}
+            {project && (
+              <AutoPublishSettings
+                projectId={project.id}
+                onSettingsChange={(s) => {
+                  setLiveFrequency(s.frequency);
+                  setAutoPublishOn(s.enabled);
+                }}
+                onFrequencyChanged={async () => {
+                  await fetchScheduledItems();
+                }}
+              />
+            )}
         </PageHeader>
 
         <Card className="p-3 sm:p-4">
@@ -268,6 +482,11 @@ export default function AeoPlanning() {
                 <h2 className="text-base sm:text-xl font-semibold">Content Calendar</h2>
                 <p className="text-xs text-muted-foreground mt-1">
                   {format(visibleStart, "d MMM", { locale: enUS })} – {format(visibleEnd, "d MMM yyyy", { locale: enUS })}
+                  {previewItems.length > 0 && (
+                    <span className="ml-2 inline-flex items-center gap-1 text-[10px]">
+                      · <span className="inline-block w-2 h-2 rounded border border-dashed border-muted-foreground" /> {previewItems.length} preview ({liveFrequency.replace("_", "/")})
+                    </span>
+                  )}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -338,7 +557,8 @@ export default function AeoPlanning() {
                               key={item.id}
                               className={cn(
                                 "text-[8px] sm:text-[10px] px-1 sm:px-1.5 py-0.5 rounded truncate font-medium flex items-center gap-0.5 sm:gap-1",
-                                item.type === "answer" ? "bg-primary/10 text-primary" : item.type === "local" ? "bg-orange-500/20 text-orange-700" : item.type === "geo" ? "bg-violet-500/20 text-violet-700" : "bg-emerald-500/20 text-emerald-700"
+                                item.type === "answer" ? "bg-primary/10 text-primary" : item.type === "local" ? "bg-orange-500/20 text-orange-700" : item.type === "geo" ? "bg-violet-500/20 text-violet-700" : "bg-emerald-500/20 text-emerald-700",
+                                item.isPreview && "opacity-60 border border-dashed border-current bg-transparent"
                               )}
                             >
                               {item.type === "answer" ? <MessageSquare className="h-2 w-2 sm:h-2.5 sm:w-2.5 shrink-0" /> : item.type === "local" ? <MapPin className="h-2 w-2 sm:h-2.5 sm:w-2.5 shrink-0" /> : item.type === "geo" ? <Globe className="h-2 w-2 sm:h-2.5 sm:w-2.5 shrink-0" /> : <FileText className="h-2 w-2 sm:h-2.5 sm:w-2.5 shrink-0" />}
@@ -522,7 +742,7 @@ export default function AeoPlanning() {
                           } else {
                             toast.error("You've used your free publish. Upgrade to publish the remaining 29 articles.", { action: { label: "Upgrade", onClick: () => window.location.href = "/checkout" } });
                           }
-                        }} disabled={publishingId === item.id || !canPublish} className={cn("text-white", canPublishFree && !isSubscribed ? "bg-emerald-600 hover:bg-emerald-700" : "bg-[#1a2058] hover:bg-[#232c66]")}>
+                        }} disabled={publishingId === item.id || !canPublish} className={cn("text-white", canPublishFree && !isSubscribed ? "bg-emerald-600 hover:bg-emerald-700" : "bg-[hsl(222,47%,11%)] hover:bg-[hsl(222,47%,15%)]")}>
                           {publishingId === item.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4 mr-1" />}
                           {canPublishFree && !isSubscribed ? "Publish Free ✨" : "Publish"}
                         </Button>

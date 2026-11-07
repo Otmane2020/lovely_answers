@@ -2,7 +2,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useActiveProject } from "@/hooks/useProjects";
-import { toast } from "sonner";
 
 export function useVisibilityScores() {
   const { project } = useActiveProject();
@@ -133,16 +132,6 @@ export function useTriggerTracking() {
       queryClient.invalidateQueries({ queryKey: ["visibility-scores"] });
       queryClient.invalidateQueries({ queryKey: ["recent-mentions"] });
       queryClient.invalidateQueries({ queryKey: ["visibility-history"] });
-    },
-    // The mutation's error was captured by React Query but nothing rendered
-    // it anywhere — the "Run first check" button just quietly reset to
-    // idle on failure (e.g. no AI provider key configured), with zero
-    // indication anything went wrong. Surface it directly here so every
-    // caller gets the error regardless of whether it also checks
-    // trigger.isError itself.
-    onError: (error: unknown) => {
-      console.error("track-mentions failed:", error);
-      toast.error(error instanceof Error ? error.message : "Could not run the visibility check — try again.");
     },
   });
 }

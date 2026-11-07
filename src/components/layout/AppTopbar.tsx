@@ -1,14 +1,14 @@
 "use client";
 import { useState } from "react";
-import { Globe, ChevronDown, Crown, Bell, LogOut, Check } from "lucide-react";
+import { ChevronDown, Crown, Bell, LogOut, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { useActiveProject, useProjects, useSetActiveProject } from "@/hooks/useProjects";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
+import { ProjectSwitcher } from "@/components/layout/ProjectSwitcher";
 
 const languages = [
   { code: "fr", label: "Français", flag: "🇫🇷" },
@@ -20,18 +20,12 @@ const languages = [
 export function AppTopbar() {
   const router = useRouter();
   const { user, signOut } = useAuth();
-  const { project, projects = [] } = useActiveProject();
   const { subscribed, isLoading: subLoading, startCheckout } = useSubscription();
-  const setActiveProject = useSetActiveProject();
   const [currentLanguage, setCurrentLanguage] = useState(languages[0]);
 
   const handleSignOut = async () => {
     await signOut();
     router.push("/");
-  };
-
-  const handleProjectChange = (projectId: string) => {
-    setActiveProject.mutate(projectId);
   };
 
   const userInitials = user?.user_metadata?.full_name
@@ -41,27 +35,7 @@ export function AppTopbar() {
   return (
     <header className="flex h-16 items-center justify-between border-b border-border bg-card/80 px-6 backdrop-blur-xl">
       <div className="flex items-center gap-4">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="gap-2 text-sm font-medium">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10"><Globe className="h-4 w-4 text-primary" /></div>
-              <span className="hidden sm:inline">{project?.name || "Select Project"}</span>
-              {project?.domain && <span className="text-muted-foreground">({project.domain})</span>}
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-64">
-            {projects.map((p) => (
-              <DropdownMenuItem key={p.id} onClick={() => handleProjectChange(p.id)} className={cn("flex items-center gap-3 py-3", project?.id === p.id && "bg-accent")}>
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10"><Globe className="h-4 w-4 text-primary" /></div>
-                <div className="flex flex-col"><span className="font-medium">{p.name}</span><span className="text-xs text-muted-foreground">{p.domain}</span></div>
-              </DropdownMenuItem>
-            ))}
-            {projects.length === 0 && <DropdownMenuItem disabled>No projects yet</DropdownMenuItem>}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-primary" onClick={() => router.push("/onboarding")}>+ Add new project</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <ProjectSwitcher />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

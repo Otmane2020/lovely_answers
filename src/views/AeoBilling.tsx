@@ -18,6 +18,18 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface Invoice {
   id: string;
@@ -32,6 +44,23 @@ export default function AeoBilling() {
   const { subscribed, trial, subscriptionEnd, openCustomerPortal } = useSubscription();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loadingInvoices, setLoadingInvoices] = useState(true);
+  const [cancelling, setCancelling] = useState(false);
+
+  const handleCancelSubscription = async () => {
+    setCancelling(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("cancel-subscription");
+      if (error) throw error;
+      const endDate = data?.period_end
+        ? format(new Date(data.period_end), "MMM d, yyyy")
+        : "the end of your billing period";
+      toast.success(`Subscription cancelled. You keep access until ${endDate}.`);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to cancel subscription");
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   // Fetch real invoices from database
   useEffect(() => {
@@ -142,9 +171,38 @@ export default function AeoBilling() {
               Manage Subscription
             </Button>
             {subscribed && (
-              <Button variant="outline" className="text-destructive hover:text-destructive hover:bg-destructive/10">
-                Cancel Subscription
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    disabled={cancelling}
+                  >
+                    {cancelling ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : null}
+                    Cancel Subscription
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Cancel your subscription?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Your subscription will remain active until{" "}
+                      {subscriptionEnd
+                        ? format(new Date(subscriptionEnd), "MMM d, yyyy")
+                        : "the end of your current billing period"}
+                      . You'll keep full access until then and won't be charged again.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Keep subscription</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleCancelSubscription}>
+                      Confirm cancellation
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             )}
           </div>
         </Card>

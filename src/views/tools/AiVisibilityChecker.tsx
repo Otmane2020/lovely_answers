@@ -192,7 +192,7 @@ export default function AiVisibilityChecker() {
   return (
     <>
       <Helmet>
-        <title>Free AI Visibility Checker — Is Your Website Visible to ChatGPT & Gemini?</title>
+        <title>Free AI Visibility Checker – ChatGPT & Gemini</title>
         <meta
           name="description"
           content="Check if ChatGPT, Gemini, Perplexity and Claude can find and recommend your website. Free AI visibility score with actionable fixes."
@@ -262,6 +262,7 @@ export default function AiVisibilityChecker() {
             <div className="flex gap-2 mb-2">
               <Input
                 type="url"
+                aria-label="Enter website URL"
                 placeholder="https://yourwebsite.com"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}

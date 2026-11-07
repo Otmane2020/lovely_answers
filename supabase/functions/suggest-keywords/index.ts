@@ -207,38 +207,66 @@ Return ONLY a JSON array:
   {"keyword": "another keyword", "intent": "transactional"}
 ]`;
 
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemma-4-31b-it:free",
-        // Free models get rate-limited upstream constantly; OpenRouter falls back
-        // through this list automatically when one errors out.
-        models: ["google/gemma-4-31b-it:free", "google/gemma-4-26b-a4b-it:free", "nvidia/nemotron-3-super-120b-a12b:free"],
-        max_tokens: 4000,
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are an expert SEO keyword researcher. You analyze real website content to suggest precise, relevant keywords. Return only valid JSON.",
-          },
-          { role: "user", content: prompt },
-        ],
-        temperature: 0.3,
-      }),
-    });
+    const FREE_MODELS = [
+      "google/gemini-2.0-flash-exp:free",
+      "meta-llama/llama-3.3-70b-instruct:free",
+      "deepseek/deepseek-chat-v3.1:free",
+      "meta-llama/llama-3.2-3b-instruct:free",
+      "google/gemma-2-9b-it:free",
+      "mistralai/mistral-7b-instruct:free",
+      "qwen/qwen-2-7b-instruct:free",
+    ];
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("[suggest-keywords] AI error:", errorText);
-      throw new Error("AI service error");
+    let content = "";
+    let lastError = "";
+    for (const model of FREE_MODELS) {
+      try {
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              {
+                role: "system",
+                content:
+                  "You are an expert SEO keyword researcher. You analyze real website content to suggest precise, relevant keywords. Return only valid JSON.",
+              },
+              { role: "user", content: prompt },
+            ],
+            temperature: 0.3,
+          }),
+        });
+
+        if (!response.ok) {
+          lastError = `${model}: ${response.status}`;
+          console.log(`[suggest-keywords] Model failed - ${lastError}`);
+          continue;
+        }
+
+        const aiData = await response.json();
+        content = aiData.choices?.[0]?.message?.content || "";
+        if (content) {
+          console.log(`[suggest-keywords] Success with model: ${model}`);
+          break;
+        }
+      } catch (e) {
+        lastError = `${model}: ${e instanceof Error ? e.message : String(e)}`;
+        console.log(`[suggest-keywords] Model error - ${lastError}`);
+      }
     }
 
-    const aiData = await response.json();
-    const content = aiData.choices?.[0]?.message?.content || "[]";
+    if (!content) {
+      console.error("[suggest-keywords] All free models failed:", lastError);
+      return new Response(
+        JSON.stringify({ suggestions: [], fallback: true, error: "AI_SERVICE_UNAVAILABLE" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
 
     // Parse JSON from response
     let suggestions: KeywordSuggestion[] = [];
@@ -264,8 +292,8 @@ Return ONLY a JSON array:
   } catch (error) {
     console.error("[suggest-keywords] Error:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ suggestions: [], fallback: true, error: error instanceof Error ? error.message : "Unknown error" }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

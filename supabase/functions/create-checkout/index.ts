@@ -7,15 +7,29 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Founding prices on "AutoPilot GEO — Starter" (prod_UYOqKNzPfdM0ZL).
-// Annual is -20% ($7.99/mo billed yearly), matching the other products' convention.
-// Overridable per environment so a price change never needs a redeploy.
-const PRICE_MONTHLY =
-  Deno.env.get("STRIPE_PRICE_MONTHLY") ?? "price_1U10c9Efti9t9nN95k2JZpYk"; // $9.99/month
-const PRICE_ANNUAL =
-  Deno.env.get("STRIPE_PRICE_ANNUAL") ?? "price_1U10cIEfti9t9nN9nZHk8ZHA"; // $95.88/year
+// ── 3 tiers × 2 cycles (USD) ──
+const PRICES: Record<string, Record<string, string>> = {
+  starter: {
+    monthly: "price_1TZI35Efti9t9nN9yj0tBl4c",
+    annual:  "price_1TZIB3Efti9t9nN9A4NxsNsg",
+  },
+  pro: {
+    monthly: "price_1TZIBYEfti9t9nN9lG9JGwUa",
+    annual:  "price_1TZIBfEfti9t9nN9ZYClUCvF",
+  },
+  agency: {
+    monthly: "price_1TZIBjEfti9t9nN9ToqTd8xu",
+    annual:  "price_1TZIBnEfti9t9nN9fmZiURZR",
+  },
+};
 
-export const TRIAL_DAYS = 3;
+// Legacy fallback (older flow with `plan: "monthly"|"annual"`).
+const LEGACY_PRICES: Record<string, string> = {
+  monthly: PRICES.pro.monthly,
+  annual:  PRICES.pro.annual,
+};
+
+const TRIAL_DAYS = 3;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -28,114 +42,95 @@ serve(async (req) => {
   );
 
   try {
-    console.log("[CREATE-CHECKOUT] Starting checkout session creation");
+    console.log("[CREATE-CHECKOUT] Starting");
 
-    // Get request body
-    let plan = "monthly";
-    let guestEmail: string | null = null;
-    let isGuest = false;
+    let body: any = {};
+    try { body = await req.json(); } catch { /* no body */ }
 
-    try {
-      const body = await req.json();
-      plan = body.plan || "monthly";
-      guestEmail = body.email || null;
-      isGuest = body.guest === true;
-    } catch {
-      // Default to monthly if no body
+    const planTier = (body.plan ?? "pro").toString();   // "starter" | "pro" | "agency" | legacy "monthly"/"annual"
+    const cycle    = (body.cycle ?? "monthly").toString(); // "monthly" | "annual"
+    const guestEmail: string | null = body.email || null;
+    const isGuest = body.guest === true;
+
+    // Resolve price ID (new shape or legacy)
+    let priceId: string | undefined;
+    if (PRICES[planTier]) {
+      priceId = PRICES[planTier][cycle] ?? PRICES[planTier].monthly;
+    } else if (LEGACY_PRICES[planTier]) {
+      priceId = LEGACY_PRICES[planTier];
     }
+    if (!priceId) throw new Error(`Unknown plan/cycle: ${planTier}/${cycle}`);
 
-    const priceId = plan === "annual" ? PRICE_ANNUAL : PRICE_MONTHLY;
-    console.log("[CREATE-CHECKOUT] Plan:", plan, "Price ID:", priceId, "Guest:", isGuest);
+    console.log("[CREATE-CHECKOUT] plan:", planTier, "cycle:", cycle, "priceId:", priceId, "guest:", isGuest);
 
     let userEmail: string | null = null;
-    let userId: string | null = null;
-
-    // Try to get authenticated user first
     const authHeader = req.headers.get("Authorization");
     if (authHeader) {
       const token = authHeader.replace("Bearer ", "");
       const { data } = await supabaseClient.auth.getUser(token);
-      if (data.user?.email) {
-        userEmail = data.user.email;
-        userId = data.user.id;
-        console.log("[CREATE-CHECKOUT] Authenticated user:", userEmail);
-      }
+      if (data.user?.email) userEmail = data.user.email;
     }
-
-    // If no authenticated user but guest email provided, use that
-    if (!userEmail && guestEmail && isGuest) {
-      userEmail = guestEmail;
-      console.log("[CREATE-CHECKOUT] Guest checkout with email:", userEmail);
-    }
-
-    // If still no email, error
-    if (!userEmail) {
-      throw new Error("Email is required for checkout");
-    }
+    if (!userEmail && guestEmail && isGuest) userEmail = guestEmail;
+    if (!userEmail) throw new Error("Email is required for checkout");
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2025-08-27.basil",
     });
 
-    // Only reuse a customer verifiably owned by THIS Supabase account — an
-    // email match alone isn't enough. Two Supabase accounts can share an
-    // email (e.g. an old/deleted account whose Stripe customer still
-    // exists), and blindly reusing whichever customer that email returns
-    // attaches this checkout to a stranger's billing history/subscription
-    // instead of this user's own. Guest checkout has no Supabase user yet
-    // to verify against, so it still matches by email only — expected,
-    // since there's no account to disambiguate against at that point.
-    let customerId: string | undefined;
-    if (userId) {
-      const customers = await stripe.customers.list({ email: userEmail, limit: 10 });
-      const owned = customers.data.find((c) => c.metadata?.supabase_user_id === userId);
-      if (owned) {
-        customerId = owned.id;
-        console.log("[CREATE-CHECKOUT] Existing owned customer found:", customerId);
-      } else {
-        const created = await stripe.customers.create({ email: userEmail, metadata: { supabase_user_id: userId } });
-        customerId = created.id;
-        console.log("[CREATE-CHECKOUT] Created new tagged customer:", customerId);
-      }
-    } else {
-      const customers = await stripe.customers.list({ email: userEmail, limit: 1 });
-      if (customers.data.length > 0) {
-        customerId = customers.data[0].id;
-        console.log("[CREATE-CHECKOUT] Existing guest customer found:", customerId);
-      }
-    }
+    // Check if customer already exists
+    const customers = await stripe.customers.list({ email: userEmail, limit: 1 });
+    const customerId = customers.data[0]?.id;
 
     const origin = req.headers.get("origin") || "https://autopilotgeo.com";
+    const uiMode = (body.ui_mode === "hosted" ? "hosted" : "embedded") as "embedded" | "hosted";
 
-    // Determine success URL — redirect to thank-you page with session_id
-    const successUrl = isGuest 
-      ? `${origin}/auth?mode=signup&checkout=success`
-      : `${origin}/thank-you?session_id={CHECKOUT_SESSION_ID}`;
-
-    // 3-day trial: the landing and onboarding both advertise "no charge until
-    // day 4", so the subscription must not bill on creation.
-    const session = await stripe.checkout.sessions.create({
+    const sessionParams: any = {
       customer: customerId,
       customer_email: customerId ? undefined : userEmail,
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
-        },
-      ],
+      line_items: [{ price: priceId, quantity: 1 }],
       mode: "subscription",
       allow_promotion_codes: true,
-      subscription_data: { trial_period_days: TRIAL_DAYS },
-      success_url: successUrl,
-      cancel_url: `${origin}/onboarding`,
-    });
+      // 3-day free trial — card required, auto-charged on day 4 unless cancelled.
+      subscription_data: {
+        trial_period_days: TRIAL_DAYS,
+        trial_settings: {
+          end_behavior: { missing_payment_method: "cancel" },
+        },
+        metadata: {
+          plan: planTier,
+          cycle,
+        },
+      },
+      payment_method_collection: "always",
+      ui_mode: uiMode,
+    };
 
-    console.log("[CREATE-CHECKOUT] Session created:", session.id);
+    if (uiMode === "embedded") {
+      // Embedded checkout — Stripe renders inside our page, no redirect.
+      sessionParams.return_url = `${origin}/thank-you?session_id={CHECKOUT_SESSION_ID}`;
+    } else {
+      sessionParams.success_url = isGuest
+        ? `${origin}/auth?mode=signup&checkout=success`
+        : `${origin}/thank-you?session_id={CHECKOUT_SESSION_ID}`;
+      sessionParams.cancel_url = `${origin}/pricing`;
+    }
 
-    return new Response(JSON.stringify({ url: session.url }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
+    const session = await stripe.checkout.sessions.create(sessionParams);
+
+    console.log("[CREATE-CHECKOUT] Session created:", session.id, "ui_mode:", uiMode);
+
+    return new Response(
+      JSON.stringify({
+        url: session.url,
+        sessionId: session.id,
+        client_secret: (session as any).client_secret ?? null,
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      }
+    );
+
   } catch (error) {
     console.error("[CREATE-CHECKOUT] Error:", error);
     const errorMessage = error instanceof Error ? error.message : String(error);

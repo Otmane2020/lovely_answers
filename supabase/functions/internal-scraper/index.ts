@@ -18,7 +18,6 @@ interface ScrapeResult {
     favicon: string;
     ogImage: string;
     language: string;
-    country: string;
     brandName: string;
     cms: string;
     headings: { level: number; text: string }[];
@@ -186,64 +185,6 @@ function htmlToMarkdown(html: string): string {
   return content;
 }
 
-// Country-code TLDs worth trusting directly — deliberately excludes generic
-// or ambiguous ones (.io, .co, .ai, .me...) that get used worldwide and
-// would be misleading as a location signal.
-const CC_TLD_COUNTRY: Record<string, string> = {
-  fr: 'FR', de: 'DE', es: 'ES', it: 'IT', nl: 'NL', be: 'BE', pt: 'PT',
-  ch: 'CH', at: 'AT', ie: 'IE', se: 'SE', no: 'NO', dk: 'DK', fi: 'FI',
-  pl: 'PL', ca: 'CA', au: 'AU', nz: 'NZ', mx: 'MX', br: 'BR', ar: 'AR',
-  ma: 'MA', dz: 'DZ', tn: 'TN', ae: 'AE', sa: 'SA', in: 'IN', jp: 'JP',
-  sg: 'SG', za: 'ZA', us: 'US', uk: 'GB',
-};
-
-/** Best signal first: a JSON-LD/microdata postal address is an explicit,
- * business-stated location — far more reliable than guessing from the TLD
- * or hreflang, both of which just describe which market a page targets. */
-function extractCountryFromAddress(html: string): string {
-  const jsonLdRegex = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
-  let match;
-  while ((match = jsonLdRegex.exec(html)) !== null) {
-    try {
-      const data = JSON.parse(match[1]);
-      const nodes = Array.isArray(data) ? data : [data, ...(data['@graph'] || [])];
-      for (const node of nodes) {
-        const addr = node?.address;
-        const raw = typeof addr?.addressCountry === 'string'
-          ? addr.addressCountry
-          : addr?.addressCountry?.name;
-        if (typeof raw === 'string' && raw.length >= 2) return raw;
-      }
-    } catch {}
-  }
-  const microMatch = html.match(/itemprop=["']addressCountry["'][^>]*content=["']([^"']+)["']/i);
-  if (microMatch) return microMatch[1];
-  return '';
-}
-
-/** Falls back to hreflang region subtags (e.g. "fr-FR" -> FR), then the
- * domain's own country-code TLD. Neither is as reliable as a stated
- * address — both describe the market a page targets, not necessarily
- * where the business actually is — but still a reasonable starting guess. */
-function detectCountry(html: string, hostname: string): string {
-  const fromAddress = extractCountryFromAddress(html);
-  if (fromAddress) return fromAddress.toUpperCase().slice(0, 2);
-
-  const hreflangRegex = /<link[^>]*rel=["']alternate["'][^>]*hreflang=["']([a-z]{2})-([A-Z]{2})["']/gi;
-  const regions: Record<string, number> = {};
-  let m;
-  while ((m = hreflangRegex.exec(html)) !== null) {
-    regions[m[2]] = (regions[m[2]] || 0) + 1;
-  }
-  const topRegion = Object.entries(regions).sort((a, b) => b[1] - a[1])[0];
-  if (topRegion) return topRegion[0];
-
-  const tld = hostname.split('.').pop()?.toLowerCase();
-  if (tld && CC_TLD_COUNTRY[tld]) return CC_TLD_COUNTRY[tld];
-
-  return '';
-}
-
 function extractSchemaTypes(html: string): string[] {
   const types: string[] = [];
   // JSON-LD
@@ -277,24 +218,13 @@ function detectCMS(html: string): string {
   if (c.includes('duda.co') || c.includes('dudaone.com')) return 'Duda';
   if (c.includes('bigcommerce.com')) return 'BigCommerce';
   if (c.includes('prestashop') || c.includes('/modules/ps_')) return 'PrestaShop';
-  // 'mage/' alone used to match — but so does every page's own
-  // <link type="image/x-icon">, misidentifying nearly any site as Magento.
-  if (c.includes('magento') || c.includes('/skin/frontend/') || c.includes('mage-init')) return 'Magento';
+  if (c.includes('magento') || c.includes('mage/')) return 'Magento';
   if (c.includes('ghost.org') || c.includes('ghost-portal')) return 'Ghost';
   if (c.includes('drupal.org') || c.includes('/sites/default/files')) return 'Drupal';
   if (c.includes('joomla') || c.includes('/media/com_')) return 'Joomla';
   if (c.includes('hubspot.com') || c.includes('hs-scripts')) return 'HubSpot';
   if (c.includes('next-head-count') || c.includes('__next')) return 'Next.js';
   if (c.includes('nuxt') || c.includes('__nuxt')) return 'Nuxt';
-  // Lovable-built sites are generic React/Vite output with no framework
-  // fingerprint of their own, but Lovable's asset storage and editor SDK
-  // domains are a real, verifiable signature (gpteng.co is the underlying
-  // gpt-engineer infra Lovable runs on).
-  if (c.includes('gpteng.co') || c.includes('gpt-engineer-file-uploads') || c.includes('lovableproject.com') || c.includes('lovable.app')) return 'Lovable';
-  // Replit-hosted apps are identifiable by their own hosting domain — only
-  // reliable while the site is still on a *.repl.co/*.replit.app/*.replit.dev
-  // URL; a custom domain drops this signal (there is no other fingerprint).
-  if (c.includes('.repl.co') || c.includes('.replit.app') || c.includes('.replit.dev')) return 'Replit';
   return '';
 }
 
@@ -329,43 +259,26 @@ function extractBrandName(url: string, title: string): string {
   }
 }
 
-/** Scores clean, human-written text (title/description/body — never raw
- * HTML/JS, which drowns out short taglines with boilerplate noise) against
- * per-language word lists and, as a lighter-weight tie-breaker, language-
- * distinctive accented characters (a single "está" or "être" is a real
- * signal even in a four-word tagline where whole-word matches are sparse). */
-function scoreLanguageFromText(text: string): { lang: string; score: number } {
-  const t = text.toLowerCase();
+function detectLanguage(html: string, metaLang: string): string {
+  if (metaLang && metaLang.length >= 2) return metaLang.substring(0, 2).toLowerCase();
+
+  const text = html.substring(0, 8000).toLowerCase();
   const scores: Record<string, number> = { en: 0, fr: 0, de: 0, es: 0, it: 0, pt: 0 };
 
-  const wordPatterns: Record<string, RegExp[]> = {
-    fr: [/\bles\b/g, /\bdes\b/g, /\bpour\b/g, /\bavec\b/g, /\bdans\b/g, /\bc'est\b/g, /\bvotre\b/g, /\bnotre\b/g, /\bplus\b/g, /\bque\b/g, /\bqualité\b/g, /\bmaison\b/g],
-    en: [/\bthe\b/g, /\band\b/g, /\byour\b/g, /\bwith\b/g, /\bfrom\b/g, /\bthat\b/g, /\bthis\b/g, /\bhave\b/g, /\bhome\b/g, /\bstyle\b/g],
-    de: [/\bund\b/g, /\bder\b/g, /\bdie\b/g, /\bdas\b/g, /\bfür\b/g, /\bnicht\b/g, /\bsich\b/g, /\büber\b/g, /\bmehr\b/g],
-    es: [/\bpara\b/g, /\bcon\b/g, /\bpor\b/g, /\bnuestro\b/g, /\btambién\b/g, /\bestá\b/g, /\bmás\b/g, /\bque\b/g, /\bun\b/g, /\buna\b/g, /\bestilo\b/g, /\bvida\b/g, /\bhogar\b/g, /\bcalidad\b/g],
-    it: [/\bdella\b/g, /\bdei\b/g, /\bnon\b/g, /\bnostro\b/g, /\bquesto\b/g, /\bperché\b/g, /\bpiù\b/g],
-    pt: [/\bnão\b/g, /\bvocê\b/g, /\bnosso\b/g, /\btambém\b/g, /\bmuito\b/g, /\besta\b/g, /\bmais\b/g],
+  const patterns: Record<string, RegExp[]> = {
+    fr: [/\bles\b/g, /\bdes\b/g, /\bpour\b/g, /\bavec\b/g, /\bdans\b/g, /\bc'est\b/g, /\bvotre\b/g, /\bnotre\b/g],
+    en: [/\bthe\b/g, /\band\b/g, /\byour\b/g, /\bwith\b/g, /\bfrom\b/g, /\bthat\b/g, /\bthis\b/g, /\bhave\b/g],
+    de: [/\bund\b/g, /\bder\b/g, /\bdie\b/g, /\bdas\b/g, /\bfür\b/g, /\bnicht\b/g, /\bsich\b/g, /\büber\b/g],
+    es: [/\bpara\b/g, /\bcon\b/g, /\bpor\b/g, /\bnuestro\b/g, /\btambién\b/g, /\bestá\b/g],
+    it: [/\bdella\b/g, /\bdei\b/g, /\bnon\b/g, /\bnostro\b/g, /\bquesto\b/g, /\bperché\b/g],
+    pt: [/\bnão\b/g, /\bvocê\b/g, /\bnosso\b/g, /\btambém\b/g, /\bmuito\b/g, /\besta\b/g],
   };
-  for (const [lang, regs] of Object.entries(wordPatterns)) {
+
+  for (const [lang, regs] of Object.entries(patterns)) {
     for (const r of regs) {
-      const m = t.match(r);
+      const m = text.match(r);
       if (m) scores[lang] += m.length;
     }
-  }
-
-  // Distinctive characters, weighted lightly (0.5) — good for breaking ties
-  // on short text where whole-word hits are scarce, not strong enough alone
-  // to override a real word-based signal for a different language.
-  const charPatterns: Record<string, RegExp> = {
-    es: /[ñ¿¡]|á|é|í|ó|ú/g,
-    fr: /[çœ]|à|â|è|ê|ë|î|ï|ô|û|ù/g,
-    de: /[ß]|ä|ö|ü/g,
-    pt: /[ãõ]|â|ê|ô|ç/g,
-    it: /à|è|ì|ò|ù/g,
-  };
-  for (const [lang, r] of Object.entries(charPatterns)) {
-    const m = t.match(r);
-    if (m) scores[lang] += m.length * 0.5;
   }
 
   let best = 'en';
@@ -373,31 +286,55 @@ function scoreLanguageFromText(text: string): { lang: string; score: number } {
   for (const [lang, score] of Object.entries(scores)) {
     if (score > bestScore) { bestScore = score; best = lang; }
   }
-  return { lang: best, score: bestScore };
+  return bestScore > 5 ? best : 'en';
 }
 
-/** A declared <html lang> is often just whatever a theme/template shipped
- * with, unrelated to the market a store actually targets (a Shopify site
- * can have shop_currency=USD, lang="en" in its boilerplate, and a homepage
- * tagline that's entirely Spanish). Content is the ground truth: only fall
- * back to the declared lang when the page's own text doesn't clearly say
- * otherwise. */
-function detectLanguage(metaLang: string, title: string, description: string, bodyText: string): string {
-  const declared = metaLang && metaLang.length >= 2 ? metaLang.substring(0, 2).toLowerCase() : '';
-  // Title/description first and weighted by repetition (x3) — a tagline
-  // saying "Más que un estilo de vida" is a stronger, cleaner signal than
-  // the same words once each buried a thousand characters into body copy.
-  const { lang: contentLang, score } = scoreLanguageFromText(
-    `${title} ${title} ${title} ${description} ${description} ${bodyText.slice(0, 2000)}`
-  );
-  if (!declared) return contentLang && score > 2 ? contentLang : 'en';
-  if (contentLang !== declared && score >= 3) return contentLang;
-  return declared;
+// SECURITY: block SSRF to private/loopback/cloud-metadata IP ranges.
+function isPrivateOrReservedHost(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".local") || h.endsWith(".internal")) return true;
+  // IPv6 loopback / link-local / unique-local
+  if (h === "::1" || h.startsWith("fe80:") || h.startsWith("fc") || h.startsWith("fd")) return true;
+  // IPv4
+  const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (m) {
+    const [a, b] = [parseInt(m[1]), parseInt(m[2])];
+    if (a === 10) return true;
+    if (a === 127) return true;
+    if (a === 0) return true;
+    if (a === 169 && b === 254) return true; // link-local + AWS/GCP/Azure metadata
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
+  }
+  return false;
 }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // SECURITY: require an authenticated caller. Edge function is reached via
+  // supabase.functions.invoke which forwards the user JWT in Authorization.
+  try {
+    const authHeader = req.headers.get("Authorization") || "";
+    if (!authHeader.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ success: false, error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+    const sb = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
+    const { data: claims, error: claimsErr } = await sb.auth.getClaims(authHeader.replace("Bearer ", ""));
+    if (claimsErr || !claims?.claims) {
+      return new Response(JSON.stringify({ success: false, error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+  } catch (_e) {
+    return new Response(JSON.stringify({ success: false, error: "Unauthorized" }),
+      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
   try {
@@ -412,6 +349,22 @@ Deno.serve(async (req) => {
     let formattedUrl = url.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
       formattedUrl = `https://${formattedUrl}`;
+    }
+
+    // SECURITY: SSRF guard — block private / loopback / metadata hosts before fetch.
+    try {
+      const parsed = new URL(formattedUrl);
+      if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+        return new Response(JSON.stringify({ success: false, error: "Unsupported protocol" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (isPrivateOrReservedHost(parsed.hostname)) {
+        return new Response(JSON.stringify({ success: false, error: "Target host is not allowed" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    } catch {
+      return new Response(JSON.stringify({ success: false, error: "Invalid URL" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     console.log('[internal-scraper] Scraping:', formattedUrl);
@@ -451,21 +404,14 @@ Deno.serve(async (req) => {
     const favicon = extractFavicon(html, formattedUrl);
     const langMatch = html.match(/<html[^>]*lang=["']([^"']+)["']/i);
     const metaLang = langMatch?.[1] || '';
-    const markdown = htmlToMarkdown(html);
-    const language = detectLanguage(metaLang, title, metaDescription || ogDescription, markdown);
+    const language = detectLanguage(html, metaLang);
     const brandName = extractBrandName(formattedUrl, title);
-    // Check the site's own hosting domain first — the most reliable signal
-    // for Replit (there's no in-page fingerprint, only the *.repl.co/
-    // *.replit.app/*.replit.dev URL itself, which a custom domain would hide).
-    const hostLower = formattedUrl.toLowerCase();
-    const cms = (hostLower.includes('.repl.co') || hostLower.includes('.replit.app') || hostLower.includes('.replit.dev'))
-      ? 'Replit'
-      : detectCMS(html);
+    const cms = detectCMS(html);
     const headings = extractHeadings(html);
     const { internal: internalLinks, external: externalLinks } = extractLinks(html, formattedUrl);
+    const markdown = htmlToMarkdown(html);
     const wordCount = markdown.split(/\s+/).filter(w => w.length > 1).length;
     const schemaTypes = extractSchemaTypes(html);
-    const country = detectCountry(html, new URL(formattedUrl).hostname);
 
     const result: ScrapeResult = {
       success: true,
@@ -476,7 +422,6 @@ Deno.serve(async (req) => {
         favicon,
         ogImage: ogImage ? (ogImage.startsWith('http') ? ogImage : new URL(ogImage, formattedUrl).href) : '',
         language,
-        country,
         brandName,
         cms,
         headings: headings.slice(0, 30),
@@ -497,7 +442,7 @@ Deno.serve(async (req) => {
       },
     };
 
-    console.log(`[internal-scraper] Done in ${Date.now() - startTime}ms | title="${title.substring(0, 50)}" | lang=${language} | country=${country || 'unknown'} | brand=${brandName} | cms=${cms} | words=${wordCount} | links=${internalLinks.length + externalLinks.length} | schema=${schemaTypes.join(',')}`);
+    console.log(`[internal-scraper] Done in ${Date.now() - startTime}ms | title="${title.substring(0, 50)}" | lang=${language} | brand=${brandName} | cms=${cms} | words=${wordCount} | links=${internalLinks.length + externalLinks.length} | schema=${schemaTypes.join(',')}`);
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

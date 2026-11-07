@@ -170,11 +170,7 @@ Generate at least 5 clusters with 5-10 keywords each. Focus on:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemma-4-31b-it:free",
-        // Free models get rate-limited upstream constantly; OpenRouter falls back
-        // through this list automatically when one errors out.
-        models: ["google/gemma-4-31b-it:free", "google/gemma-4-26b-a4b-it:free", "nvidia/nemotron-3-super-120b-a12b:free"],
-        max_tokens: 4000,
+        model: "google/gemini-2.0-flash-exp:free",
         messages: [
           { role: "system", content: "You are a keyword research expert. Always respond with valid JSON only." },
           { role: "user", content: keywordPrompt }

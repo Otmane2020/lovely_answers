@@ -23,16 +23,14 @@ import { Loader2, ExternalLink, BookOpen, CheckCircle2, AlertCircle, ChevronRigh
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useActiveProject } from "@/hooks/useProjects";
 import { useIsMobile } from "@/hooks/use-mobile";
 import shopifyLogo from "@/assets/shopify-logo-new.png";
 import wixLogo from "@/assets/wix-logo.png";
 import wordpressLogo from "@/assets/wordpress-logo-new.png";
 import bigcommerceLogo from "@/assets/bigcommerce-logo.png";
 import framerLogo from "@/assets/framer-logo.png";
-import boltLogo from "@/assets/bolt-new-logo.svg";
+import boltLogo from "@/assets/bolt-logo.png";
 import lovableLogo from "@/assets/lovable-logo.svg";
-import replitLogo from "@/assets/replit-logo.svg";
 
 // Guide steps for each platform
 const PLATFORM_GUIDES: Record<string, { title: string; steps: string[] }> = {
@@ -182,6 +180,8 @@ const CMS_CONFIG: Record<string, {
     description: "Publish articles directly to your WordPress blog.",
     helpText: "Use Application Passwords (Users → Profile → Application Passwords).",
     fields: [
+      { key: "name", label: "Integration Name", placeholder: "My WordPress Blog" },
+      { key: "endpoint", label: "Site URL", placeholder: "https://your-domain.com", helpText: "Your WordPress site URL (without /wp-json)" },
       { key: "username", label: "WordPress Username", placeholder: "admin", helpText: "Your WordPress login username" },
       { key: "token", label: "Application Password", placeholder: "xxxx xxxx xxxx xxxx", type: "password", helpText: "Generated from Users → Application Passwords (spaces are OK)" },
     ],
@@ -194,6 +194,7 @@ const CMS_CONFIG: Record<string, {
     description: "Publish blog articles to your Shopify store.",
     helpText: "Create a Custom App in Shopify Admin → Settings → Apps and sales channels → Develop apps.",
     fields: [
+      { key: "name", label: "Integration Name", placeholder: "My Shopify Store" },
       { key: "endpoint", label: "Store URL", placeholder: "https://your-store.myshopify.com", helpText: "Your .myshopify.com URL" },
       { key: "token", label: "Admin API Access Token", placeholder: "shpat_xxxxx", type: "password", helpText: "From your Custom App → API credentials" },
     ],
@@ -207,6 +208,7 @@ const CMS_CONFIG: Record<string, {
     helpText: "Create an API Key on dev.wix.com with Blog permissions.",
     tutorialUrl: "https://dev.wix.com/docs/rest/account-level-apis/api-keys/generating-api-keys",
     fields: [
+      { key: "name", label: "Integration Name", placeholder: "My Wix Blog" },
       { key: "token", label: "API Key", placeholder: "IST.eyJ... (starts with IST)", type: "password", helpText: "From dev.wix.com → API Keys → Generate" },
       { key: "siteId", label: "Site ID", placeholder: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", helpText: "In the URL: manage.wix.com/dashboard/SITE-ID-HERE/..." },
     ],
@@ -218,6 +220,7 @@ const CMS_CONFIG: Record<string, {
     description: "Publish CMS items to your Webflow collections.",
     helpText: "Create an API token in Webflow → Site Settings → Integrations.",
     fields: [
+      { key: "name", label: "Integration Name", placeholder: "My Webflow Site" },
       { key: "endpoint", label: "Collection ID", placeholder: "Enter your collection ID", helpText: "Found in CMS collection settings" },
       { key: "token", label: "API Token", placeholder: "Enter your Webflow API token", type: "password" },
       { key: "siteId", label: "Site ID", placeholder: "Enter your Webflow Site ID" },
@@ -230,6 +233,7 @@ const CMS_CONFIG: Record<string, {
     description: "Publish blog posts to your Duda website.",
     helpText: "Get API credentials from Duda → Dashboard → API Access.",
     fields: [
+      { key: "name", label: "Integration Name", placeholder: "My Duda Site" },
       { key: "endpoint", label: "Site Name", placeholder: "Enter your Duda site name", helpText: "The site name from your dashboard" },
       { key: "token", label: "API Key", placeholder: "Enter your Duda API key", type: "password" },
     ],
@@ -241,6 +245,7 @@ const CMS_CONFIG: Record<string, {
     description: "Connect to any REST API endpoint.",
     helpText: "Send content to your own API endpoint.",
     fields: [
+      { key: "name", label: "Integration Name", placeholder: "My Custom API" },
       { key: "endpoint", label: "API Endpoint", placeholder: "https://api.example.com/posts" },
       { key: "token", label: "Authorization Header", placeholder: "Bearer your-token", type: "password", helpText: "Full Authorization header value" },
       { key: "method", label: "HTTP Method", placeholder: "POST" },
@@ -253,6 +258,7 @@ const CMS_CONFIG: Record<string, {
     description: "Send content to any webhook (Zapier, Make, n8n, etc.).",
     helpText: "Perfect for automation workflows.",
     fields: [
+      { key: "name", label: "Integration Name", placeholder: "My Zapier Webhook" },
       { key: "endpoint", label: "Webhook URL", placeholder: "https://hooks.zapier.com/..." },
     ],
   },
@@ -263,6 +269,7 @@ const CMS_CONFIG: Record<string, {
     color: "from-gray-700 to-black",
     description: "Publish blog content to your BigCommerce store.",
     fields: [
+      { key: "name", label: "Integration Name", placeholder: "My BigCommerce Store" },
       { key: "endpoint", label: "Store Hash", placeholder: "Enter your store hash", helpText: "Found in your API account settings" },
       { key: "token", label: "API Token", placeholder: "Enter your API token", type: "password" },
     ],
@@ -273,6 +280,7 @@ const CMS_CONFIG: Record<string, {
     color: "from-pink-500 to-pink-600",
     description: "Connect your Snapps site for content publishing.",
     fields: [
+      { key: "name", label: "Integration Name", placeholder: "My Snapps Site" },
       { key: "endpoint", label: "Site URL", placeholder: "https://your-site.snapps.ai" },
       { key: "token", label: "API Key", placeholder: "Enter your API key", type: "password" },
     ],
@@ -284,6 +292,7 @@ const CMS_CONFIG: Record<string, {
     color: "from-sky-400 to-blue-500",
     description: "Connect your Framer site via webhook.",
     fields: [
+      { key: "name", label: "Integration Name", placeholder: "My Framer Site" },
       { key: "endpoint", label: "Webhook URL", placeholder: "https://your-webhook-url" },
       { key: "token", label: "API Token", placeholder: "Enter your API token (optional)", type: "password", optional: true },
     ],
@@ -296,6 +305,7 @@ const CMS_CONFIG: Record<string, {
     description: "Connect your Bolt.new AI-powered web project.",
     helpText: "Use webhooks or API to push content to your Bolt project.",
     fields: [
+      { key: "name", label: "Integration Name", placeholder: "My Bolt Project" },
       { key: "endpoint", label: "Webhook URL", placeholder: "https://your-bolt-webhook.com/..." },
       { key: "token", label: "API Token", placeholder: "Enter your API token (optional)", type: "password", optional: true },
     ],
@@ -309,18 +319,6 @@ const CMS_CONFIG: Record<string, {
     helpText: "",
     fields: [
       { key: "endpoint", label: "Supabase Function URL", placeholder: "https://xxx.supabase.co/functions/v1/receive-article", helpText: "The receive-article function URL from your project" },
-    ],
-  },
-  replit: {
-    name: "Replit",
-    icon: replitLogo as unknown as string,
-    isImage: true,
-    color: "from-orange-500 to-orange-700",
-    description: "Publish articles to your Replit-hosted project.",
-    helpText: "Use webhooks or API to push content to your Replit app.",
-    fields: [
-      { key: "endpoint", label: "Webhook URL", placeholder: "https://your-repl-name.username.repl.co/webhook" },
-      { key: "token", label: "API Token", placeholder: "Enter your API token (optional)", type: "password", optional: true },
     ],
   },
 };
@@ -351,7 +349,6 @@ export function IntegrationConfigModal({
   const [testMessage, setTestMessage] = useState<string>("");
   const [showGuide, setShowGuide] = useState(false);
   const isMobile = useIsMobile();
-  const { project } = useActiveProject();
 
 const LOVABLE_PROMPT = `Create a complete blog system with article ingestion:
 
@@ -399,19 +396,12 @@ After implementation, give me the Edge Function URL (format: https://xxx.supabas
   // Reset form when modal opens with new data
   useEffect(() => {
     if (open) {
-      // WordPress no longer asks for the site URL — onboarding already has
-      // it as the project's own website_url, no reason to type it twice.
-      const base = existingConfig || {};
-      const withDefaults =
-        platform === "wordpress" && !base.endpoint && project?.website_url
-          ? { ...base, endpoint: project.website_url }
-          : base;
-      setFormData(withDefaults);
+      setFormData(existingConfig || {});
       setTestResult(null);
       setTestMessage("");
       setShowGuide(false);
     }
-  }, [open, existingConfig, platform, project?.website_url]);
+  }, [open, existingConfig]);
 
   if (!platform || !CMS_CONFIG[platform]) return null;
 
@@ -620,7 +610,8 @@ After implementation, give me the Edge Function URL (format: https://xxx.supabas
               placeholder={field.placeholder}
               value={formData[field.key] || ""}
               onChange={(e) => handleFieldChange(field.key, e.target.value)}
-              className="text-sm h-11 px-3"
+              className="text-sm h-11 px-3 text-foreground bg-background placeholder:text-muted-foreground"
+              autoComplete="off"
             />
             {field.helpText && (
               <p className="text-[10px] text-muted-foreground leading-tight">{field.helpText}</p>

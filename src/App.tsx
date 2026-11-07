@@ -1,6 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ScrollToTop } from "@/components/ScrollToTop";
-import { Analytics } from "@vercel/analytics/react";
 
 // Views
 import IndexPage from "@/views/Index";
@@ -23,7 +22,8 @@ import AeoSupport from "@/views/AeoSupport";
 import AeoIntegrations from "@/views/AeoIntegrations";
 import AeoHistory from "@/views/AeoHistory";
 import AeoGeo from "@/views/AeoGeo";
-import GEODashboard from "@/views/GEODashboard";
+import GeoEngineLanding from "@/views/GeoEngineLanding";
+
 import AeoLocal from "@/views/AeoLocal";
 import AeoReddit from "@/views/AeoReddit";
 import AeoSeoAudit from "@/views/AeoSeoAudit";
@@ -36,7 +36,6 @@ import ThankYou from "@/views/ThankYou";
 import NotFound from "@/views/NotFound";
 import AiSeo from "@/views/AiSeo";
 import AutoSeo from "@/views/AutoSeo";
-import Audit from "@/views/Audit";
 import AuditPremium from "@/views/AuditPremium";
 import AiShoppingAssistant from "@/views/AiShoppingAssistant";
 import ShoppingDashboard from "@/views/ShoppingDashboard";
@@ -48,47 +47,52 @@ import GoogleAnalyticsPage from "@/views/GoogleAnalyticsPage";
 import GoogleTagManager from "@/views/GoogleTagManager";
 import AeoPublicAnswer from "@/views/AeoPublicAnswer";
 import LocalAeoArticle from "@/views/LocalAeoArticle";
+import GeoSuccessMetrics from "@/views/GeoSuccessMetrics";
 import AiVisibilityChecker from "@/views/tools/AiVisibilityChecker";
 import Onboarding from "@/views/Onboarding";
-import Landing from "@/views/Landing";
 import AeoWizard from "@/views/AeoWizard";
+import OAuthConsent from "@/views/OAuthConsent";
+import Connect from "@/views/Connect";
+import { SubscriptionGate } from "@/components/auth/SubscriptionGate";
+
+const gated = (el: React.ReactNode) => <SubscriptionGate>{el}</SubscriptionGate>;
 
 export default function App() {
   return (
     <BrowserRouter>
       <ScrollToTop />
-      <Analytics />
       <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/landing" element={<Landing />} />
-        <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/" element={<IndexPage />} />
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/signup" element={<SignupPage />} />
-        <Route path="/wizard" element={<AeoWizard />} />
-        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/wizard" element={gated(<AeoWizard />)} />
+        <Route path="/dashboard" element={gated(<Dashboard />)} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/blog" element={<Blog />} />
+        <Route path="/blog/measuring-geo-success" element={<GeoSuccessMetrics />} />
         <Route path="/blog/:slug" element={<AeoPublicAnswer />} />
-        <Route path="/settings" element={<AeoSettings />} />
-        <Route path="/answers" element={<Answers />} />
+        <Route path="/settings" element={gated(<AeoSettings />)} />
+        <Route path="/answers" element={gated(<Answers />)} />
         <Route path="/answers/:slug" element={<AeoPublicAnswer />} />
-        <Route path="/articles" element={<AeoArticles />} />
-        <Route path="/keywords" element={<AeoKeywords />} />
-        <Route path="/planning" element={<AeoPlanning />} />
-        <Route path="/analytics" element={<AeoAnalytics />} />
+        <Route path="/articles" element={gated(<AeoArticles />)} />
+        <Route path="/keywords" element={gated(<AeoKeywords />)} />
+        <Route path="/planning" element={gated(<AeoPlanning />)} />
+        <Route path="/analytics" element={gated(<AeoAnalytics />)} />
         <Route path="/checkout" element={<Checkout />} />
         <Route path="/cart" element={<Cart />} />
         <Route path="/subscription" element={<AeoSubscription />} />
         <Route path="/billing" element={<AeoBilling />} />
         <Route path="/support" element={<AeoSupport />} />
-        <Route path="/integrations" element={<AeoIntegrations />} />
-        <Route path="/history" element={<AeoHistory />} />
-        <Route path="/geo" element={<GEODashboard />} />
-        <Route path="/local" element={<AeoLocal />} />
+        <Route path="/integrations" element={gated(<AeoIntegrations />)} />
+        <Route path="/history" element={gated(<AeoHistory />)} />
+        <Route path="/geo" element={gated(<AeoGeo />)} />
+        <Route path="/geo-engine" element={<GeoEngineLanding />} />
+
+        <Route path="/local" element={gated(<AeoLocal />)} />
         <Route path="/localAEO" element={<LocalAeoArticle />} />
         <Route path="/reddit" element={<AeoReddit />} />
         <Route path="/seo-audit" element={<AeoSeoAudit />} />
-        <Route path="/audit" element={<Audit />} />
         <Route path="/audit-premium" element={<AuditPremium />} />
         <Route path="/about" element={<About />} />
         <Route path="/privacy" element={<Privacy />} />
@@ -106,6 +110,8 @@ export default function App() {
         <Route path="/google-tag-manager" element={<GoogleTagManager />} />
         <Route path="/account" element={<AeoAccount />} />
         <Route path="/tools/ai-visibility-checker" element={<AiVisibilityChecker />} />
+        <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
+        <Route path="/connect" element={<Connect />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

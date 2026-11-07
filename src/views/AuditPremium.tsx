@@ -141,6 +141,7 @@ export default function AuditPremium() {
       <Helmet>
         <title>Premium AEO Audit – Competitor Analysis | AutoPilot Geo</title>
         <meta name="description" content="Get a comprehensive AEO audit with competitor analysis, market trends, and strategic recommendations." />
+        <link rel="canonical" href="https://autopilotgeo.com/audit-premium" />
       </Helmet>
 
       <div className="min-h-screen bg-background">

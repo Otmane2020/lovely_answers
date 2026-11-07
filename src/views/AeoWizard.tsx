@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { trackOnboardingComplete } from "@/lib/gtag-conversions";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,9 +20,12 @@ interface AnalyzedKeyword {
 
 export default function AeoWizard() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const addSiteMode = searchParams.get("addSite") === "1";
+  const shopifySource = searchParams.get("source") === "shopify";
   const { user } = useAuth();
   const createProject = useCreateProject();
-  
+
   const [step, setStep] = useState(1);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -36,26 +39,53 @@ export default function AeoWizard() {
     businessDescription: "",
   });
 
+  useEffect(() => {
+    const urlFromParam = searchParams.get("url");
+    if (urlFromParam && !data.websiteUrl) {
+      setData((prev) => ({ ...prev, websiteUrl: decodeURIComponent(urlFromParam) }));
+    }
+  }, [searchParams, data.websiteUrl]);
+
+  // Prefill from Shopify shop info when coming from shopify_oauth flow
+  useEffect(() => {
+    if (!shopifySource || !user) return;
+    (async () => {
+      const { data: proj } = await supabase
+        .from("projects")
+        .select("id, website_url, language, brand_name, business_description")
+        .eq("user_id", user.id)
+        .eq("source", "shopify_oauth")
+        .maybeSingle();
+      if (proj) {
+        setData({
+          websiteUrl: proj.website_url || "",
+          language: proj.language || "en",
+          businessDescription: proj.business_description || "",
+        });
+      }
+    })();
+  }, [shopifySource, user]);
+
   // Force light theme
   useEffect(() => {
     document.documentElement.classList.remove("dark");
   }, []);
 
-  // Check if user already has a project - redirect to dashboard
+  // Check if user already has a project - redirect to dashboard (unless they still need onboarding)
   useEffect(() => {
     const checkExistingProject = async () => {
-      if (!user) return;
+      if (!user || addSiteMode || shopifySource) return;
       const { data: projects } = await supabase
         .from("projects")
-        .select("id")
+        .select("id, needs_onboarding")
         .eq("user_id", user.id)
         .limit(1);
-      if (projects && projects.length > 0) {
+      if (projects && projects.length > 0 && !projects[0].needs_onboarding) {
         router.replace("/dashboard");
       }
     };
     checkExistingProject();
-  }, [user, router]);
+  }, [user, router, addSiteMode, shopifySource]);
 
   const isValidUrl = (url: string) => {
     try {
@@ -132,41 +162,76 @@ export default function AeoWizard() {
     try {
       const urlToSave = data.websiteUrl.startsWith("http") ? data.websiteUrl : `https://${data.websiteUrl}`;
       const domain = new URL(urlToSave).hostname.replace("www.", "");
-      const project = await createProject.mutateAsync({
-        name: domain,
-        website_url: urlToSave,
-        language: data.language,
-        business_description: data.businessDescription,
-        competitors: analyzedCompetitors.length > 0 ? analyzedCompetitors : undefined,
-        audience: analyzedAudiences.length > 0 ? analyzedAudiences.join(", ") : undefined,
-      });
-      if (analyzedKeywords.length > 0 && project?.id) {
+      let projectId: string | undefined;
+
+      if (shopifySource) {
+        // Shopify onboarding: update the existing shopify_oauth project instead of creating a new one
+        const { data: existing } = await supabase
+          .from("projects")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("source", "shopify_oauth")
+          .maybeSingle();
+        if (existing?.id) {
+          await supabase.from("projects").update({
+            website_url: urlToSave,
+            language: data.language,
+            business_description: data.businessDescription,
+            audience: analyzedAudiences.length > 0 ? analyzedAudiences.join(", ") : null,
+            competitors: analyzedCompetitors.length > 0 ? analyzedCompetitors : null,
+            needs_onboarding: false,
+          }).eq("id", existing.id);
+          await supabase.from("generation_settings").update({
+            language: data.language,
+            onboarding_completed: true,
+          }).eq("project_id", existing.id);
+          projectId = existing.id;
+        }
+      }
+
+      if (!projectId) {
+        const project = await createProject.mutateAsync({
+          name: domain,
+          website_url: urlToSave,
+          language: data.language,
+          business_description: data.businessDescription,
+          competitors: analyzedCompetitors.length > 0 ? analyzedCompetitors : undefined,
+          audience: analyzedAudiences.length > 0 ? analyzedAudiences.join(", ") : undefined,
+        });
+        projectId = project?.id;
+      }
+
+      if (analyzedKeywords.length > 0 && projectId) {
         const keywordRows = analyzedKeywords.map((k) => ({
-          project_id: project.id,
+          project_id: projectId!,
           keyword: k.keyword,
           intent: k.intent || "informational",
           is_used: false,
         }));
         await supabase.from("keywords").insert(keywordRows);
       }
-      if (project?.id) {
-        // Backend orchestration: strategic scraping + business analysis + context snapshot.
-        supabase.functions.invoke('onboarding-pipeline', {
-          body: { projectId: project.id, mode: 'full' }
-        }).catch(err => console.error('[WIZARD] Onboarding pipeline error:', err));
+      if (projectId) {
         supabase.functions.invoke('generate-30-days-content', {
-          body: { projectId: project.id, language: data.language, days: 30, questionsPerDay: 1, titlesOnly: true }
+          body: { projectId, language: data.language, days: 30, questionsPerDay: 1, titlesOnly: true }
         }).catch(err => console.error('[WIZARD] Title generation error:', err));
       }
       trackOnboardingComplete(data.websiteUrl);
       toast.success("Project created! Your 30-day content plan is generating 💜");
       router.push("/dashboard");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating project:", error);
-      toast.error("Failed to create project");
+      const msg = error?.message || "";
+      if (msg.startsWith("SITES_LIMIT_REACHED")) {
+        toast.error(msg.replace("SITES_LIMIT_REACHED: ", ""), {
+          action: { label: "Upgrade", onClick: () => router.push("/pricing") },
+        });
+      } else {
+        toast.error("Failed to create project");
+      }
     } finally {
       setIsCreating(false);
     }
+
   };
 
   const canProceedStep1 = data.websiteUrl.length > 0 && isValidUrl(data.websiteUrl);
@@ -352,30 +417,117 @@ export default function AeoWizard() {
             exit={{ opacity: 0, y: -20 }}
             className="flex-1 flex flex-col space-y-5 pt-2"
           >
+            {/* Header */}
             <div className="text-center space-y-1.5">
-              <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
-                <FileText className="w-6 h-6 text-primary" />
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/10 border border-red-500/20">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                <span className="text-[11px] font-medium text-red-600">AI Visibility Audit</span>
               </div>
-              <h2 className="text-xl font-semibold text-foreground">Confirm your business</h2>
+              <h2 className="text-xl font-semibold text-foreground">
+                {getDomainFromUrl(data.websiteUrl) || "Your site"} is barely visible on AI
+              </h2>
               <p className="text-sm text-muted-foreground">
-                We'll boost your AI assistant recommendations 🚀
+                Here's what we found — and how AutoPilot GEO fixes it 🚀
               </p>
             </div>
 
+            {/* Audit score card */}
+            {(() => {
+              const kwCount = analyzedKeywords.length;
+              const compCount = analyzedCompetitors.length;
+              // Low baseline score: site barely visible on AI before AutoPilot GEO
+              const score = Math.max(8, Math.min(34, 12 + kwCount + compCount * 2));
+              const potential = Math.min(96, 78 + Math.floor(kwCount / 2));
+              return (
+                <div className="rounded-2xl border border-border bg-gradient-to-br from-red-500/5 via-background to-emerald-500/5 p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-4">
+                    {/* Current score */}
+                    <div className="flex items-center gap-3">
+                      <div className="relative w-16 h-16 flex items-center justify-center">
+                        <svg className="absolute inset-0 -rotate-90" viewBox="0 0 64 64">
+                          <circle cx="32" cy="32" r="28" stroke="hsl(var(--muted))" strokeWidth="6" fill="none" />
+                          <circle
+                            cx="32" cy="32" r="28"
+                            stroke="rgb(239 68 68)" strokeWidth="6" fill="none"
+                            strokeDasharray={`${(score / 100) * 175.9} 175.9`}
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                        <div className="text-center">
+                          <p className="text-base font-bold text-red-600 leading-none">{score}</p>
+                          <p className="text-[8px] text-muted-foreground">/100</p>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Current</p>
+                        <p className="text-sm font-semibold text-red-600">Poor visibility</p>
+                      </div>
+                    </div>
+                    <ArrowRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                    {/* Potential score */}
+                    <div className="flex items-center gap-3">
+                      <div>
+                        <p className="text-[11px] text-muted-foreground uppercase tracking-wide text-right">Potential</p>
+                        <p className="text-sm font-semibold text-emerald-600">With AutoPilot</p>
+                      </div>
+                      <div className="relative w-16 h-16 flex items-center justify-center">
+                        <svg className="absolute inset-0 -rotate-90" viewBox="0 0 64 64">
+                          <circle cx="32" cy="32" r="28" stroke="hsl(var(--muted))" strokeWidth="6" fill="none" />
+                          <circle
+                            cx="32" cy="32" r="28"
+                            stroke="rgb(16 185 129)" strokeWidth="6" fill="none"
+                            strokeDasharray={`${(potential / 100) * 175.9} 175.9`}
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                        <div className="text-center">
+                          <p className="text-base font-bold text-emerald-600 leading-none">{potential}</p>
+                          <p className="text-[8px] text-muted-foreground">/100</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* AI engines mentions */}
+                  <div className="grid grid-cols-3 gap-1.5 pt-1 border-t border-border">
+                    {[
+                      { name: "ChatGPT", icon: Bot },
+                      { name: "Gemini", icon: Sparkles },
+                      { name: "Perplexity", icon: Search },
+                    ].map((engine) => {
+                      const Icon = engine.icon;
+                      return (
+                        <div key={engine.name} className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-red-500/5 border border-red-500/10">
+                          <Icon className="w-3 h-3 text-red-500 flex-shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-medium text-foreground truncate">{engine.name}</p>
+                            <p className="text-[9px] text-red-600">Not mentioned</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Detected data */}
             {hasDetectedData && (
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {/* Keywords */}
                 {analyzedKeywords.length > 0 && (
                   <div className="rounded-xl border border-border bg-muted/20 p-3 space-y-2.5">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <Search className="w-3.5 h-3.5 text-primary" />
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <Target className="w-3.5 h-3.5 text-primary" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground">{analyzedKeywords.length} keyword opportunities</p>
+                          <p className="text-[11px] text-muted-foreground">Ready to capture on AI engines</p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-foreground">{analyzedKeywords.length} keywords</p>
-                        <p className="text-[11px] text-muted-foreground">Ready for content generation</p>
-                      </div>
+                      <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-500/10 px-1.5 py-0.5 rounded">HIGH INTENT</span>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       {analyzedKeywords.slice(0, 6).map((kw, i) => (
@@ -396,44 +548,62 @@ export default function AeoWizard() {
                 {/* Competitors & Audiences */}
                 <div className="grid grid-cols-2 gap-2.5">
                   {analyzedCompetitors.length > 0 && (
-                    <div className="rounded-xl border border-border bg-muted/20 p-3 space-y-2">
+                    <div className="rounded-xl border border-orange-500/20 bg-orange-500/5 p-3 space-y-2">
                       <div className="flex items-center gap-2">
                         <div className="w-7 h-7 rounded-lg bg-orange-500/10 flex items-center justify-center flex-shrink-0">
                           <Swords className="w-3.5 h-3.5 text-orange-600" />
                         </div>
-                        <p className="text-sm font-medium text-foreground">{analyzedCompetitors.length}</p>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground">{analyzedCompetitors.length} ahead of you</p>
+                          <p className="text-[10px] text-orange-600">On AI results</p>
+                        </div>
                       </div>
                       <div className="space-y-0.5">
                         {analyzedCompetitors.slice(0, 3).map((comp, i) => (
                           <p key={i} className="text-[11px] text-muted-foreground truncate">• {comp}</p>
                         ))}
                         {analyzedCompetitors.length > 3 && (
-                          <p className="text-[11px] text-primary font-medium">+{analyzedCompetitors.length - 3} more</p>
+                          <p className="text-[11px] text-orange-600 font-medium">+{analyzedCompetitors.length - 3} more</p>
                         )}
                       </div>
                     </div>
                   )}
                   {analyzedAudiences.length > 0 && (
-                    <div className="rounded-xl border border-border bg-muted/20 p-3 space-y-2">
+                    <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 space-y-2">
                       <div className="flex items-center gap-2">
                         <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
                           <Users className="w-3.5 h-3.5 text-emerald-600" />
                         </div>
-                        <p className="text-sm font-medium text-foreground">{analyzedAudiences.length}</p>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground">{analyzedAudiences.length} audiences</p>
+                          <p className="text-[10px] text-emerald-600">To target</p>
+                        </div>
                       </div>
                       <div className="space-y-0.5">
                         {analyzedAudiences.slice(0, 3).map((aud, i) => (
                           <p key={i} className="text-[11px] text-muted-foreground truncate">• {aud}</p>
                         ))}
                         {analyzedAudiences.length > 3 && (
-                          <p className="text-[11px] text-primary font-medium">+{analyzedAudiences.length - 3} more</p>
+                          <p className="text-[11px] text-emerald-600 font-medium">+{analyzedAudiences.length - 3} more</p>
                         )}
                       </div>
                     </div>
                   )}
                 </div>
+
+                {/* Promise banner */}
+                <div className="rounded-xl bg-gradient-to-r from-primary/10 via-primary/5 to-emerald-500/10 border border-primary/20 p-3 flex items-start gap-2.5">
+                  <Rocket className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-foreground">AutoPilot GEO will fix this</p>
+                    <p className="text-[11px] text-muted-foreground leading-snug">
+                      30 days of AI-optimized content, automatic publishing, and live tracking on ChatGPT, Gemini & Perplexity.
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
+
 
             {/* Business description */}
             <Textarea

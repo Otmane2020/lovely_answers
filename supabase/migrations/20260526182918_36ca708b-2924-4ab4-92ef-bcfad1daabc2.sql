@@ -1,0 +1,1 @@
+UPDATE public.answers SET published_url = 'https://ranki.ai/blog/' || slug WHERE project_id IN ('1eba3e69-fe01-4d74-a40d-21141814c515','ec19d6f0-78fa-428c-9c87-f6bbbe5d42a8','8d38bc60-4360-4053-afda-4ae1a6a28bee') AND published_at IS NOT NULL AND (published_url IS NULL OR published_url = '') AND slug IS NOT NULL AND slug <> '';

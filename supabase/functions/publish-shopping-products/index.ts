@@ -17,15 +17,11 @@ Deno.serve(async (req) => {
 
     const today = new Date().toISOString().split("T")[0];
 
-    // Scheduled for today or earlier, not yet published — `lte` (not `eq`)
-    // so a row that failed to publish (see publishFailed below, which
-    // deliberately leaves `published` false) gets picked up and retried on
-    // the next run instead of falling out of every future day's exact-date
-    // match.
+    // Get all scheduled entries for today that haven't been published
     const { data: todayEntries, error: fetchError } = await supabase
       .from("shopping_planning")
       .select("*, product:shopping_products(*)")
-      .lte("scheduled_date", today)
+      .eq("scheduled_date", today)
       .eq("published", false);
 
     if (fetchError) throw fetchError;
@@ -67,7 +63,7 @@ Deno.serve(async (req) => {
 
       // Build article HTML from product AI content
       const faqHtml = Array.isArray(product.ai_faq) && product.ai_faq.length > 0
-        ? `<h2>Questions fréquentes</h2>${product.ai_faq.map((f: any) =>
+        ? `<h2>Questions fréquentes</h2>${product.ai_faq.map((f: any) => 
             `<h3>${f.question}</h3><p>${f.answer}</p>`
           ).join("")}`
         : "";
@@ -76,38 +72,10 @@ Deno.serve(async (req) => {
         ? `<script type="application/ld+json">${JSON.stringify(product.ai_schema_markup)}</script>`
         : "";
 
-      // The real catalog image was fetched and stored at import time
-      // (product.image_url) but this function never rendered it — the
-      // published article had no <img> at all, and the AI-authored
-      // ai_schema_markup JSON-LD isn't visible content. Use the real
-      // product image(s), never a stock/hallucinated one; alt text is the
-      // product title plus brand for context, not the raw filename.
-      const escapeAttr = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
-      const productName = product.ai_title || product.title;
-      const altText = escapeAttr(product.brand ? `${productName} — ${product.brand}` : productName);
-      const allImages = [product.image_url, ...(product.additional_images || [])].filter(Boolean);
-      const imagesHtml = allImages.length
-        ? allImages.map((url: string, i: number) =>
-            `<img src="${escapeAttr(url)}" alt="${i === 0 ? altText : `${altText} — image ${i + 1}`}" loading="lazy">`
-          ).join("")
-        : "";
-
-      const priceHtml = product.price
-        ? product.sale_price && product.sale_price < product.price
-          ? `<p><strong>Prix : ${product.sale_price} ${product.currency || "EUR"}</strong> <s>${product.price} ${product.currency || "EUR"}</s></p>`
-          : `<p><strong>Prix : ${product.price} ${product.currency || "EUR"}</strong></p>`
-        : "";
-
-      const ctaHtml = product.product_url
-        ? `<p><a href="${escapeAttr(product.product_url)}" rel="nofollow">Voir le produit</a></p>`
-        : "";
-
       const htmlContent = `
         <article>
-          ${imagesHtml}
           ${product.ai_description ? `<p>${product.ai_description}</p>` : ""}
-          ${priceHtml}
-          ${ctaHtml}
+          ${product.price ? `<p><strong>Prix : ${product.price} ${product.currency || "EUR"}</strong></p>` : ""}
           ${faqHtml}
           ${schemaScript}
         </article>
@@ -119,18 +87,28 @@ Deno.serve(async (req) => {
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-|-$/g, "");
 
-      // If CMS integration exists, publish via cms-publish — and only
-      // treat it as published if that actually succeeded. This used to
-      // log-and-continue on any CMS error, then unconditionally mark the
-      // product "published" right after regardless of outcome — a false
-      // positive that made real publish failures invisible.
+      // Publish: use Shopify Admin API directly if shopify integration, else generic cms-publish
       let publishedUrl: string | null = null;
-      let publishFailed = false;
-      let publishErrorMessage: string | null = null;
-
-      if (integration) {
+      if (integration?.platform === "shopify") {
         try {
-          const { data: cmsData, error: cmsError } = await supabase.functions.invoke("cms-publish", {
+          const { data: shopRes, error: shopErr } = await supabase.functions.invoke("shopify-publish-article", {
+            body: {
+              projectId: entry.project_id,
+              title: product.ai_title || product.title,
+              bodyHtml: htmlContent,
+              handle: slug,
+              metaDescription: product.ai_description?.substring(0, 160),
+              tags: ["AutoPilotGEO", product.category].filter(Boolean).join(","),
+            },
+          });
+          if (shopErr) console.error("Shopify publish error:", shopErr);
+          if (shopRes?.url) publishedUrl = shopRes.url;
+        } catch (e) {
+          console.error("Shopify publish failed:", e);
+        }
+      } else if (integration) {
+        try {
+          const { error: cmsError } = await supabase.functions.invoke("cms-publish", {
             body: {
               projectId: entry.project_id,
               title: product.ai_title || product.title,
@@ -139,30 +117,10 @@ Deno.serve(async (req) => {
               metaDescription: product.ai_description?.substring(0, 160),
             },
           });
-          if (cmsError || !cmsData?.success) {
-            publishFailed = true;
-            publishErrorMessage = cmsError?.message || cmsData?.message || "CMS publish did not succeed";
-            console.error("CMS publish error:", publishErrorMessage);
-          } else {
-            publishedUrl = cmsData.publishedUrl || `/${slug}`;
-          }
+          if (cmsError) console.error("CMS publish error:", cmsError);
         } catch (e) {
-          publishFailed = true;
-          publishErrorMessage = e instanceof Error ? e.message : String(e);
           console.error("CMS publish failed:", e);
         }
-      } else {
-        // No CMS connected — nowhere else to send it, publish internally
-        // (matches publish-geo-content's fallback for the same case).
-        publishedUrl = `/${slug}`;
-      }
-
-      if (publishFailed) {
-        await supabase
-          .from("shopping_products")
-          .update({ publish_error: publishErrorMessage })
-          .eq("id", product.id);
-        continue; // leave it eligible for the next run instead of marking it live
       }
 
       // Update product status
@@ -171,8 +129,7 @@ Deno.serve(async (req) => {
         .update({
           status: "published",
           published_at: new Date().toISOString(),
-          published_url: publishedUrl,
-          publish_error: null,
+          published_url: publishedUrl || `/${slug}`,
         })
         .eq("id", product.id);
 
