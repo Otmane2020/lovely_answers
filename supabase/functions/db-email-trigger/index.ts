@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const FROM_EMAIL = "AutoPilot Geo <support@autopilotgeo.com>";
 const ADMIN_EMAIL = "support@autopilotgeo.com";
+const NEW_USER_NOTIFICATION_EMAIL = "benyahya.otmane@gmail.com";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -30,12 +31,24 @@ serve(async (req: Request): Promise<Response> => {
     const payload: WebhookPayload = await req.json();
     console.log("[db-email-trigger] Received:", payload.type, payload.table);
 
-    // Handle new profile creation (welcome email + AI automation)
+    // Handle every newly created profile (admin notification + welcome email + AI automation)
     if (payload.table === "profiles" && payload.type === "INSERT") {
       const profile = payload.record;
       if (profile.email) {
-        console.log("[db-email-trigger] Sending welcome email to:", profile.email);
+        console.log("[db-email-trigger] New signup detected:", profile.email);
 
+        // Notify the account owner independently so a welcome-email failure does not suppress this alert.
+        try {
+          await sendEmail({
+            to: NEW_USER_NOTIFICATION_EMAIL,
+            subject: `Nouvelle inscription AutoPilot Geo : ${profile.email}`,
+            html: generateNewUserNotification(profile),
+          });
+        } catch (notificationError) {
+          console.error("[db-email-trigger] New-user notification failed:", notificationError);
+        }
+
+        console.log("[db-email-trigger] Sending welcome email to:", profile.email);
         await sendEmail({
           to: profile.email,
           subject: "Welcome to AutoPilot Geo! 🎉",
@@ -141,6 +154,43 @@ async function sendEmail(options: { to: string; subject: string; html: string })
   const data = await response.json();
   console.log("[db-email-trigger] Email sent:", data.id);
   return data;
+}
+
+function escapeHtml(value: unknown): string {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[char]!);
+}
+
+function generateNewUserNotification(profile: Record<string, any>): string {
+  const name = escapeHtml(profile.full_name || "Non renseigné");
+  const email = escapeHtml(profile.email);
+  const phone = escapeHtml(profile.phone || "Non renseigné");
+  const userId = escapeHtml(profile.id || "Non renseigné");
+  const createdAt = escapeHtml(profile.created_at || new Date().toISOString());
+
+  return `
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+    <body style="font-family:Arial,sans-serif;line-height:1.6;color:#222;max-width:600px;margin:0 auto;padding:24px">
+      <h2 style="color:#7c3aed">Nouvelle inscription AutoPilot Geo</h2>
+      <p>Un nouveau compte vient d'être créé.</p>
+      <div style="background:#f4f4f5;border-radius:8px;padding:16px">
+        <p><strong>Nom :</strong> ${name}</p>
+        <p><strong>E-mail :</strong> ${email}</p>
+        <p><strong>Téléphone :</strong> ${phone}</p>
+        <p><strong>Date d'inscription :</strong> ${createdAt}</p>
+        <p><strong>ID utilisateur :</strong> ${userId}</p>
+      </div>
+      <p><a href="https://autopilotgeo.com/superadmin">Ouvrir l'administration</a></p>
+    </body>
+    </html>
+  `;
 }
 
 function generateWelcomeEmail(name: string): string {
