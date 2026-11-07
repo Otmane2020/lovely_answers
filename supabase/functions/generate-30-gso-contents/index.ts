@@ -350,31 +350,54 @@ Output ONLY valid JSON array:
     );
     console.log("[generate-30-gso] Topics raw response length:", topicsRaw.length, "status:", topicsStatus);
     let topics: { topic: string; type: string; keywords: string[] }[] = [];
+    let fallbackTopicsUsed = false;
 
     try {
-      let cleaned = topicsRaw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-      // Handle case where model wraps array in object: {"topics": [...]} 
+      const cleaned = topicsRaw.replace(/```json\n?/gi, "").replace(/```\n?/g, "").trim();
+      if (!cleaned) throw new Error("AI returned an empty topic response");
+
+      // Handle a direct array or an object containing the array.
       const parsed = JSON.parse(cleaned);
       if (Array.isArray(parsed)) {
         topics = parsed;
       } else if (parsed && typeof parsed === "object") {
-        // Find the first array property
         const arrKey = Object.keys(parsed).find(k => Array.isArray(parsed[k]));
         if (arrKey) topics = parsed[arrKey];
       }
-      if (!Array.isArray(topics) || topics.length === 0) {
-        throw new Error("No topics array found in response");
-      }
+
+      topics = topics
+        .filter((item: any) => item && typeof item.topic === "string" && item.topic.trim())
+        .map((item: any) => ({
+          topic: item.topic.trim(),
+          type: ["article", "pillar", "mentions", "comparison"].includes(item.type) ? item.type : "article",
+          keywords: Array.isArray(item.keywords) ? item.keywords.filter((keyword: unknown) => typeof keyword === "string") : [],
+        }))
+        .slice(0, toGenerate);
+
+      if (topics.length === 0) throw new Error("AI response contained no usable topics");
     } catch (e) {
-      // NO FALLBACK - if the AI cannot return valid topics, abort the whole run
-      console.error("[generate-30-gso] Failed to parse topics — aborting (no fallback):", topicsRaw.slice(0, 1000), "error:", String(e), "details:", topicsErr || "none");
-      throw new Error(`AI topic generation failed: ${String(e)}`);
+      // Keep the planning run alive when a free model returns empty, truncated, or invalid JSON.
+      console.warn("[generate-30-gso] Topic response was unusable; using deterministic topic fallback:", {
+        error: String(e),
+        modelError: topicsErr || "none",
+        responseLength: topicsRaw.length,
+        status: topicsStatus,
+      });
+      topics = buildFallbackTopics({
+        brand,
+        businessType,
+        audience,
+        keywords: keywordItems,
+        language,
+        count: toGenerate,
+      });
+      fallbackTopicsUsed = true;
     }
 
     // Filter out duplicate topics
-    topics = topics.filter(t => !existingTopics.has(t.topic?.toLowerCase()));
+    topics = topics.filter(t => !existingTopics.has(t.topic.toLowerCase()));
     if (topics.length === 0) {
-      throw new Error("All AI-generated topics were duplicates — nothing new to publish");
+      throw new Error("All generated topics were duplicates — nothing new to publish");
     }
 
 
@@ -584,8 +607,15 @@ Output JSON: {"title":"...under 70 chars","meta_description":"...150-160 chars",
 
     console.log("[generate-30-gso] Created " + created.length + "/" + toGenerate + " GEO contents");
 
+    if (created.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "AI content generation failed for all topics", code: "AI_CONTENT_EMPTY", created: 0 }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     return new Response(
-      JSON.stringify({ success: true, created: created.length, items: created }),
+      JSON.stringify({ success: true, created: created.length, items: created, fallbackTopicsUsed }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
