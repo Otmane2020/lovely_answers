@@ -85,6 +85,25 @@ export default {
     const url = new URL(request.url);
     const userAgent = request.headers.get('User-Agent') || '';
     const pathname = url.pathname;
+    if (pathname === '/api/public/health/cloud') {
+      const headers = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store, max-age=0' };
+      if (request.method !== 'GET' && request.method !== 'HEAD') {
+        return new Response(null, { status: 405, headers: { ...headers, Allow: 'GET, HEAD' } });
+      }
+      try {
+        const health = await fetch('https://pnohfokjlhpzrkczruju.supabase.co/functions/v1/cloud-health', {
+          signal: AbortSignal.timeout(8000),
+          headers: { Accept: 'application/json' },
+        });
+        const result = await health.json();
+        const healthy = health.ok && result.status === 'ok' && result.checks?.database === true && result.checks?.auth === true;
+        return new Response(request.method === 'HEAD' ? null : JSON.stringify(result), {
+          status: healthy ? 200 : 503, headers,
+        });
+      } catch {
+        return new Response(request.method === 'HEAD' ? null : JSON.stringify({ status: 'unavailable' }), { status: 503, headers });
+      }
+    }
     // Dynamic sitemap.xml → proxy to Supabase edge function (includes all blog/answers)
     if (pathname === '/sitemap.xml') {
       try {
