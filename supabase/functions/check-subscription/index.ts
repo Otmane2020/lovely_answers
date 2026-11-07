@@ -86,28 +86,15 @@ async function triggerUnlockIfNeeded(supabaseClient: any, userId: string, authHe
   }).catch((e) => logStep("Unlock trigger error (ignored)", { error: String(e) }));
 }
 
-// Cooldown between two auto-generation attempts for the same project.
-// Without it, every check-subscription poll re-fires generate-30-gso-contents,
-// and when generation fails (AI quota) the loop never ends.
-const GEO_AUTOGEN_COOLDOWN_MS = 30 * 60 * 1000;
-
 async function triggerGeoIfNeeded(supabaseClient: any, userId: string) {
   const { data: userProjects } = await supabaseClient
     .from("projects")
-    .select("id, last_geo_autogen_at")
+    .select("id")
     .eq("user_id", userId)
     .limit(1);
 
   if (!userProjects || userProjects.length === 0) return;
   const projectId = userProjects[0].id;
-  const lastRun = userProjects[0].last_geo_autogen_at
-    ? new Date(userProjects[0].last_geo_autogen_at).getTime()
-    : 0;
-
-  if (Date.now() - lastRun < GEO_AUTOGEN_COOLDOWN_MS) {
-    logStep("GEO generation skipped (cooldown active)", { projectId });
-    return;
-  }
 
   const now = new Date();
   const in30 = new Date();
@@ -121,12 +108,6 @@ async function triggerGeoIfNeeded(supabaseClient: any, userId: string) {
     .lte("scheduled_date", in30.toISOString());
 
   if ((count || 0) >= 30) return;
-
-  // Stamp BEFORE firing so concurrent invocations can't pile up.
-  await supabaseClient
-    .from("projects")
-    .update({ last_geo_autogen_at: new Date().toISOString() })
-    .eq("id", projectId);
 
   logStep("User needs GEO planning - triggering generation", { projectId, count: count || 0 });
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";

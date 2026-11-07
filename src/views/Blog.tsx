@@ -113,7 +113,7 @@ export default function Blog() {
 
       <div className="min-h-screen">
         {/* Header - Dark */}
-        <header className="border-b border-border bg-card sticky top-0 z-50">
+        <header className="border-b border-border bg-white sticky top-0 z-50">
           <div className="container flex h-16 items-center justify-between">
             <Link href="/" className="flex items-center">
               <AnimatedLogo size="sm" />
@@ -154,7 +154,7 @@ export default function Blog() {
         </section>
 
         {/* Featured Guides */}
-        <section className="bg-card pt-12">
+        <section className="bg-white pt-12">
           <div className="container space-y-6">
             <div className="max-w-4xl mx-auto rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 to-white p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
@@ -164,7 +164,7 @@ export default function Blog() {
                     AEO vs GEO: What Is the Difference Between Answer Engine and Generative Engine Optimization?
                   </Link>
                 </h2>
-                <p className="text-foreground/80 text-sm max-w-xl">
+                <p className="text-gray-700 text-sm max-w-xl">
                   A side-by-side comparison of answer engine optimization and generative engine optimization, with tactics for ranking in voice assistants and AI search summaries.
                 </p>
               </div>
@@ -185,7 +185,7 @@ export default function Blog() {
                     How to Measure the Success of Generative Engine Optimization Campaigns
                   </Link>
                 </h2>
-                <p className="text-foreground/80 text-sm max-w-xl">
+                <p className="text-gray-700 text-sm max-w-xl">
                   A complete framework for tracking AI citation share, brand sentiment in LLM responses, and conversion attribution from generative search.
                 </p>
               </div>
@@ -201,7 +201,7 @@ export default function Blog() {
         </section>
 
         {/* Articles Grid - White */}
-        <section className="py-16 bg-card">
+        <section className="py-16 bg-white">
           <div className="container">
 
             {isLoading ? (
@@ -212,20 +212,20 @@ export default function Blog() {
               </div>
             ) : filteredAnswers.length === 0 ? (
               <div className="text-center py-16">
-                <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                <FileText className="h-16 w-16 text-gray-500 mx-auto mb-4" />
                 <h2 className="text-2xl font-semibold mb-2 text-[hsl(222,47%,11%)]">{searchQuery ? "No articles found" : "No articles yet"}</h2>
-                <p className="text-foreground/80 mb-6">{searchQuery ? "Try adjusting your search terms" : "Check back soon for AI-optimized content"}</p>
+                <p className="text-gray-700 mb-6">{searchQuery ? "Try adjusting your search terms" : "Check back soon for AI-optimized content"}</p>
                 {searchQuery && <Button variant="outline" onClick={() => setSearchQuery("")}>Clear Search</Button>}
               </div>
             ) : (
               <>
                 <div className="flex items-center justify-between mb-8">
-                  <p className="text-foreground/80">{filteredAnswers.length} article{filteredAnswers.length !== 1 ? "s" : ""}</p>
+                  <p className="text-gray-700">{filteredAnswers.length} article{filteredAnswers.length !== 1 ? "s" : ""}</p>
                 </div>
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                   {filteredAnswers.map((answer) => (
                     <Link key={answer.id} href={`/blog/${answer.slug}`} aria-label={`Read article: ${answer.question}`}>
-                      <Card className="h-full hover:shadow-lg transition-shadow group cursor-pointer border-border">
+                      <Card className="h-full hover:shadow-lg transition-shadow group cursor-pointer border-gray-200">
                         <CardHeader>
                           <div className="flex items-start justify-between gap-2">
                             <CardTitle className="text-lg leading-tight group-hover:text-violet-600 transition-colors text-[hsl(222,47%,11%)]">
@@ -237,10 +237,10 @@ export default function Blog() {
                           </div>
                         </CardHeader>
                         <CardContent>
-                          <p className="text-foreground/80 text-sm mb-4 line-clamp-3">
+                          <p className="text-gray-700 text-sm mb-4 line-clamp-3">
                             {truncateText(answer.answer.replace(/<[^>]*>/g, ""), 150)}
                           </p>
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <div className="flex items-center justify-between text-xs text-gray-600">
                             <div className="flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
                               {format(new Date(answer.published_at), "MMM d, yyyy")}
@@ -266,7 +266,7 @@ export default function Blog() {
               <h2 className="text-3xl font-bold mb-4 text-white">Want AI-Optimized Content for Your Business?</h2>
               <p className="text-white/80 mb-8">AutoPilot Geo helps you create content that ranks first in AI search engines.</p>
               <Link href="/auth">
-                <Button size="lg" className="gap-2 bg-card text-[hsl(222,47%,11%)] hover:bg-white/90">
+                <Button size="lg" className="gap-2 bg-white text-[hsl(222,47%,11%)] hover:bg-white/90">
                   Get Started Free <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>

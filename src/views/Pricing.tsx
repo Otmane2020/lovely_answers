@@ -71,14 +71,14 @@ export default function Pricing() {
         <script type="application/ld+json">{JSON.stringify(faqStructuredData)}</script>
       </Helmet>
 
-      <div className="min-h-screen bg-card text-foreground">
-        <nav className="fixed top-0 z-50 w-full border-b border-border bg-white/90 backdrop-blur-xl">
+      <div className="min-h-screen bg-white text-gray-900">
+        <nav className="fixed top-0 z-50 w-full border-b border-gray-100 bg-white/90 backdrop-blur-xl">
           <div className="container flex h-16 items-center justify-between">
             <Link href="/" className="flex items-center"><AnimatedLogo size="md" /></Link>
             <div className="flex items-center gap-2 sm:gap-4">
-              <Button variant="ghost" className="text-muted-foreground hover:text-foreground hover:bg-secondary" asChild><Link href="/">Home</Link></Button>
-              <Button variant="ghost" className="text-muted-foreground hover:text-foreground hover:bg-secondary" asChild><Link href="/auth">Sign In</Link></Button>
-              <Button className="bg-[hsl(var(--primary-deep))] text-white hover:bg-primary rounded-xl" asChild>
+              <Button variant="ghost" className="text-gray-600 hover:text-gray-900 hover:bg-gray-100" asChild><Link href="/">Home</Link></Button>
+              <Button variant="ghost" className="text-gray-600 hover:text-gray-900 hover:bg-gray-100" asChild><Link href="/auth">Sign In</Link></Button>
+              <Button className="bg-gray-900 text-white hover:bg-gray-800 rounded-xl" asChild>
                 <Link href="/checkout?plan=pro&cycle=annual">Start free <ArrowRight className="h-4 w-4 ml-1" /></Link>
               </Button>
             </div>
@@ -86,28 +86,28 @@ export default function Pricing() {
         </nav>
 
         {/* HERO */}
-        <section className="relative overflow-hidden pt-32 pb-12" style={{ background: "var(--gradient-subtle)" }}>
+        <section className="relative overflow-hidden pt-32 pb-12" style={{ background: "linear-gradient(180deg, #ffffff 0%, #f8f7f4 100%)" }}>
           <div
             className="absolute inset-0 pointer-events-none"
             style={{ background: "radial-gradient(ellipse 80% 50% at 50% 0%, rgba(37,99,235,0.06) 0%, transparent 70%)" }}
           />
           <div className="container relative">
             <div className="mx-auto max-w-3xl text-center">
-              <Badge className="mb-6 bg-secondary text-blue-700 border-border hover:bg-secondary">3-day free trial · Card required · Cancel anytime</Badge>
-              <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl text-foreground" style={{ letterSpacing: "-0.02em" }}>
-                Get cited by <span className="text-primary">ChatGPT</span> in 30 days
+              <Badge className="mb-6 bg-blue-50 text-blue-700 border-blue-100 hover:bg-blue-50">3-day free trial · Card required · Cancel anytime</Badge>
+              <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl text-gray-900" style={{ letterSpacing: "-0.02em" }}>
+                Get cited by <span className="text-blue-600">ChatGPT</span> in 30 days
               </h1>
-              <p className="mt-6 text-xl text-muted-foreground max-w-2xl mx-auto">
+              <p className="mt-6 text-xl text-gray-500 max-w-2xl mx-auto">
                 Simple pricing. No setup fees. No long-term commitment. Just AI visibility.
               </p>
 
               {/* Billing toggle */}
-              <div className="mt-10 inline-flex items-center gap-1 rounded-full border border-border bg-card p-1 shadow-sm">
+              <div className="mt-10 inline-flex items-center gap-1 rounded-full border border-gray-200 bg-white p-1 shadow-sm">
                 <button
                   onClick={() => setCycle("monthly")}
                   className={cn(
                     "px-5 py-2 rounded-full text-sm font-medium transition",
-                    cycle === "monthly" ? "bg-[hsl(var(--primary-deep))] text-white" : "text-muted-foreground hover:text-foreground"
+                    cycle === "monthly" ? "bg-gray-900 text-white" : "text-gray-500 hover:text-gray-900"
                   )}
                 >
                   Monthly
@@ -116,7 +116,7 @@ export default function Pricing() {
                   onClick={() => setCycle("annual")}
                   className={cn(
                     "px-5 py-2 rounded-full text-sm font-medium transition flex items-center gap-2",
-                    cycle === "annual" ? "bg-[hsl(var(--primary-deep))] text-white" : "text-muted-foreground hover:text-foreground"
+                    cycle === "annual" ? "bg-gray-900 text-white" : "text-gray-500 hover:text-gray-900"
                   )}
                 >
                   Annual
@@ -134,33 +134,33 @@ export default function Pricing() {
                   <div
                     key={plan.id}
                     className={cn(
-                      "relative rounded-2xl border p-7 flex flex-col bg-card transition-all",
+                      "relative rounded-2xl border p-7 flex flex-col bg-white transition-all",
                       isPopular
                         ? "border-blue-300 shadow-2xl shadow-blue-500/10 md:scale-[1.03] ring-1 ring-blue-200"
-                        : "border-border shadow-sm hover:border-border hover:shadow-md"
+                        : "border-gray-100 shadow-sm hover:border-gray-200 hover:shadow-md"
                     )}
                   >
                     {isPopular && (
                       <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                        <span className="inline-flex items-center gap-1 bg-primary text-white text-xs font-semibold px-3 py-1 rounded-full shadow-sm">
+                        <span className="inline-flex items-center gap-1 bg-blue-600 text-white text-xs font-semibold px-3 py-1 rounded-full shadow-sm">
                           <Sparkles className="h-3 w-3" /> Most popular
                         </span>
                       </div>
                     )}
                     <div>
-                      <h2 className="text-xl font-bold text-foreground">{plan.name}</h2>
-                      <p className="mt-2 text-sm text-muted-foreground">{plan.tagline}</p>
+                      <h2 className="text-xl font-bold text-gray-900">{plan.name}</h2>
+                      <p className="mt-2 text-sm text-gray-500">{plan.tagline}</p>
                     </div>
 
                     <div className="mt-6">
                       <div className="flex items-baseline gap-1">
-                        <span className="text-5xl font-bold text-foreground">{formatUSD(price.perMonth)}</span>
-                        <span className="text-muted-foreground text-sm">/mo</span>
+                        <span className="text-5xl font-bold text-gray-900">{formatUSD(price.perMonth)}</span>
+                        <span className="text-gray-600 text-sm">/mo</span>
                       </div>
                       {cycle === "annual" ? (
-                        <p className="mt-1 text-xs text-muted-foreground">Billed {formatUSD(price.amount)} /year</p>
+                        <p className="mt-1 text-xs text-gray-600">Billed {formatUSD(price.amount)} /year</p>
                       ) : (
-                        <p className="mt-1 text-xs text-muted-foreground">Billed monthly · Cancel anytime</p>
+                        <p className="mt-1 text-xs text-gray-600">Billed monthly · Cancel anytime</p>
                       )}
                     </div>
 
@@ -168,8 +168,8 @@ export default function Pricing() {
                       className={cn(
                         "mt-6 w-full rounded-xl",
                         isPopular
-                          ? "bg-primary hover:bg-blue-500 text-white"
-                          : "bg-[hsl(var(--primary-deep))] hover:bg-primary text-white"
+                          ? "bg-blue-600 hover:bg-blue-500 text-white"
+                          : "bg-gray-900 hover:bg-gray-800 text-white"
                       )}
                       asChild
                     >
@@ -180,8 +180,8 @@ export default function Pricing() {
 
                     <ul className="mt-7 space-y-3 flex-1">
                       {plan.features.map((f, i) => (
-                        <li key={i} className="flex items-start gap-2.5 text-sm text-foreground/80">
-                          <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                        <li key={i} className="flex items-start gap-2.5 text-sm text-gray-700">
+                          <Check className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
                           <span>{f}</span>
                         </li>
                       ))}
@@ -191,7 +191,7 @@ export default function Pricing() {
               })}
             </div>
 
-            <div className="mt-8 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+            <div className="mt-8 flex items-center justify-center gap-2 text-sm text-gray-500">
               <Shield className="h-4 w-4" /> Card required · No charge during trial · Cancel in 1 click
             </div>
           </div>
@@ -199,20 +199,20 @@ export default function Pricing() {
 
 
         {/* FAQ */}
-        <section className="py-20 bg-card">
+        <section className="py-20 bg-white">
           <div className="container max-w-3xl">
             <div className="text-center mb-12">
               <h2 className="text-3xl font-bold mb-4 text-[hsl(222,47%,11%)]">FAQs</h2>
-              <p className="text-muted-foreground">
+              <p className="text-gray-500">
                 Question we missed?{" "}
                 <a href="mailto:support@autopilotgeo.com" className="text-violet-600 hover:underline">Email us</a>
               </p>
             </div>
             <Accordion type="single" collapsible className="space-y-4">
               {faqs.map((faq, i) => (
-                <AccordionItem key={i} value={`item-${i}`} className="border rounded-lg px-4 bg-secondary">
+                <AccordionItem key={i} value={`item-${i}`} className="border rounded-lg px-4 bg-gray-50">
                   <AccordionTrigger className="text-left hover:no-underline text-[hsl(222,47%,11%)]">{faq.question}</AccordionTrigger>
-                  <AccordionContent className="text-muted-foreground">{faq.answer}</AccordionContent>
+                  <AccordionContent className="text-gray-500">{faq.answer}</AccordionContent>
                 </AccordionItem>
               ))}
             </Accordion>

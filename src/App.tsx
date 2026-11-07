@@ -5,7 +5,7 @@ import { ScrollToTop } from "@/components/ScrollToTop";
 import IndexPage from "@/views/Index";
 import AuthPage from "@/views/Auth";
 import SignupPage from "@/views/Signup";
-import Dashboard from "@/views/GEODashboard";
+import Dashboard from "@/views/Dashboard";
 import Pricing from "@/views/Pricing";
 import Blog from "@/views/Blog";
 import AeoSettings from "@/views/AeoSettings";
@@ -53,7 +53,6 @@ import Onboarding from "@/views/Onboarding";
 import AeoWizard from "@/views/AeoWizard";
 import OAuthConsent from "@/views/OAuthConsent";
 import Connect from "@/views/Connect";
-import CloudHealth from "@/views/CloudHealth";
 import { SubscriptionGate } from "@/components/auth/SubscriptionGate";
 
 const gated = (el: React.ReactNode) => <SubscriptionGate>{el}</SubscriptionGate>;
@@ -63,7 +62,6 @@ export default function App() {
     <BrowserRouter>
       <ScrollToTop />
       <Routes>
-        <Route path="/api/public/health/cloud" element={<CloudHealth />} />
         <Route path="/" element={<IndexPage />} />
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/signup" element={<SignupPage />} />

@@ -181,7 +181,7 @@ export function AIDemoSection() {
                             {/* Competitor Result */}
                             <div className="p-2 md:p-4 rounded-lg border border-border/50 bg-muted/30">
                               <p className="text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">competitor-site.com</p>
-                              <p className="text-primary font-medium text-xs md:text-sm">Digital Marketing Services</p>
+                              <p className="text-blue-600 font-medium text-xs md:text-sm">Digital Marketing Services</p>
                               <div className="mt-1 md:mt-2 space-y-0.5 md:space-y-1">
                                 <div className="h-1.5 md:h-2 bg-muted rounded w-full" />
                                 <div className="h-1.5 md:h-2 bg-muted rounded w-3/4" />
@@ -209,7 +209,7 @@ export function AIDemoSection() {
                             {/* Another Result */}
                             <div className="p-2 md:p-4 rounded-lg border border-border/50 bg-muted/30 opacity-60">
                               <p className="text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">another-agency.com</p>
-                              <p className="text-primary font-medium text-xs md:text-sm">Marketing Solutions</p>
+                              <p className="text-blue-600 font-medium text-xs md:text-sm">Marketing Solutions</p>
                               <div className="mt-1 md:mt-2 space-y-0.5 md:space-y-1">
                                 <div className="h-1.5 md:h-2 bg-muted rounded w-full" />
                               </div>

@@ -1,2 +1,0 @@
-# Architecture rules
-- Public Cloud health monitoring is served by the custom-domain Worker proxy and an uncached Edge Function checking database and auth; never use the SPA response as proof of health.

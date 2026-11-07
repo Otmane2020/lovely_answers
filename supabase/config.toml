@@ -1,178 +1,258 @@
 project_id = "pnohfokjlhpzrkczruju"
 
-[functions]
-  [functions.abandoned-cart-emails]
-    schedule = "0 * * * *"
-    verify_jwt = false
-  [functions.add-negative-keyword]
-    verify_jwt = false
-  [functions.admin-login-as]
-    verify_jwt = false
-  [functions.aeo-sync]
-    verify_jwt = false
-  [functions.analyze-aeo]
-    verify_jwt = false
-  [functions.analyze-google-ads]
-    verify_jwt = false
-  [functions.analyze-gsc-anomalies]
-    verify_jwt = false
-  [functions.analyze-website]
-    verify_jwt = false
-  [functions.auth-email-hook]
-    verify_jwt = false
-  [functions.auto-generate-aeo]
-    verify_jwt = false
-  [functions.bulk-index-articles]
-    verify_jwt = false
-  [functions.check-planning-completeness]
-    schedule = "0 */6 * * *"
-    verify_jwt = false
-  [functions.check-subscription]
-    verify_jwt = false
-  [functions.cms-publish]
-    verify_jwt = false
-  [functions.crawl-site-keywords]
-    verify_jwt = false
-  [functions.create-audit-checkout]
-    verify_jwt = false
-  [functions.create-cart-checkout]
-    verify_jwt = false
-  [functions.create-checkout]
-    verify_jwt = false
-  [functions.create-competitor-ad-group]
-    verify_jwt = false
-  [functions.create-google-ads-conversions]
-    verify_jwt = false
-  [functions.create-search-campaign]
-    verify_jwt = false
-  [functions.customer-portal]
-    verify_jwt = false
-  [functions.daily-planning-fill]
-    schedule = "0 6 * * *"
-    verify_jwt = false
-  [functions.db-email-trigger]
-    verify_jwt = false
-  [functions.debug-shopping-status]
-    verify_jwt = false
-  [functions.delete-project-content]
-    verify_jwt = false
-  [functions.email-webhook]
-    verify_jwt = false
-  [functions.firecrawl-scrape]
-    verify_jwt = false
-  [functions.firecrawl-scrape-fast]
-    verify_jwt = false
-  [functions.free-audit]
-    verify_jwt = false
-  [functions.generate-30-days-content]
-    verify_jwt = false
-  [functions.generate-30-local-answers]
-    verify_jwt = false
-  [functions.generate-aeo-answers]
-    verify_jwt = false
-  [functions.generate-aeo-article]
-    verify_jwt = false
-  [functions.generate-articles]
-    verify_jwt = false
-  [functions.generate-google-ads]
-    verify_jwt = false
-  [functions.generate-local-answer]
-    verify_jwt = false
-  [functions.generate-strategic-articles]
-    verify_jwt = false
-  [functions.get-public-answer]
-    verify_jwt = false
-  [functions.get-search-console-data]
-    verify_jwt = false
-  [functions.gmb-fetch-business]
-    verify_jwt = false
-  [functions.gmb-local-visibility]
-    verify_jwt = false
-  [functions.gmb-oauth-url]
-    verify_jwt = false
-  [functions.gmb-publish-post]
-    verify_jwt = false
-  [functions.google-ads-oauth-token]
-    verify_jwt = false
-  [functions.google-ads-oauth-url]
-    verify_jwt = false
-  [functions.google-oauth-token]
-    verify_jwt = false
-  [functions.google-oauth-url]
-    verify_jwt = false
-  [functions.gsc-indexing-diagnostics]
-    verify_jwt = false
-  [functions.gsc-request-indexing]
-    verify_jwt = false
-  [functions.gsc-test-indexation]
-    verify_jwt = false
-  [functions.index-published-articles]
-    schedule = "30 * * * *"
-    verify_jwt = false
-  [functions.internal-scraper]
-    verify_jwt = false
-  [functions.keyword-research]
-    verify_jwt = false
-  [functions.list-search-console-sites]
-    verify_jwt = false
-  [functions.manage-google-ads]
-    verify_jwt = false
-  [functions.manage-pmax-service]
-    verify_jwt = false
-  [functions.parse-sitemap]
-    verify_jwt = false
-  [functions.places-search]
-    verify_jwt = false
-  [functions.prerender]
-    verify_jwt = false
-  [functions.publish-geo-content]
-    schedule = "0 2 * * *"
-    verify_jwt = false
-  [functions.publish-scheduled-answers]
-    schedule = "0 * * * *"
-    verify_jwt = false
-  [functions.receive-article]
-    verify_jwt = false
-  [functions.reddit-agent]
-    verify_jwt = false
-  [functions.reset-project-content]
-    verify_jwt = false
-  [functions.rolling-30-day-planner]
-    schedule = "10 * * * *"
-    verify_jwt = false
-  [functions.send-audit-email]
-    verify_jwt = false
-  [functions.send-email]
-    verify_jwt = false
-  [functions.seo-audit]
-    verify_jwt = false
-  [functions.serp-first]
-    verify_jwt = false
-  [functions.shopify-fetch-context]
-    verify_jwt = false
-  [functions.shopify-import-products]
-    verify_jwt = false
-  [functions.shopify-oauth-callback]
-    verify_jwt = false
-  [functions.shopify-oauth-install]
-    verify_jwt = false
-  [functions.shopify-publish-article]
-    verify_jwt = false
-  [functions.sitemap]
-    verify_jwt = false
-  [functions.stripe-webhook]
-    verify_jwt = false
-  [functions.suggest-audiences]
-    verify_jwt = false
-  [functions.suggest-keywords]
-    verify_jwt = false
-  [functions.sync-google-ads]
-    verify_jwt = false
-  [functions.test-integration]
-    verify_jwt = false
-  [functions.toggle-ad-group-status]
-    verify_jwt = false
-  [functions.unlock-articles]
-    verify_jwt = false
-  [functions.verify-audit-payment]
-    verify_jwt = false
+[functions.firecrawl-scrape]
+verify_jwt = false
+
+[functions.firecrawl-scrape-fast]
+verify_jwt = false
+
+[functions.analyze-website]
+verify_jwt = false
+
+[functions.auto-generate-aeo]
+verify_jwt = false
+
+[functions.generate-articles]
+verify_jwt = false
+
+[functions.generate-aeo-answers]
+verify_jwt = false
+
+[functions.generate-aeo-article]
+verify_jwt = false
+
+[functions.seo-audit]
+verify_jwt = false
+
+[functions.keyword-research]
+verify_jwt = false
+
+[functions.cms-publish]
+verify_jwt = false
+
+[functions.reddit-agent]
+verify_jwt = false
+
+[functions.create-checkout]
+verify_jwt = false
+
+[functions.create-cart-checkout]
+verify_jwt = false
+
+[functions.check-subscription]
+verify_jwt = false
+
+[functions.customer-portal]
+verify_jwt = false
+
+[functions.aeo-sync]
+verify_jwt = false
+
+[functions.publish-scheduled-answers]
+verify_jwt = false
+schedule = "0 * * * *"
+
+[functions.generate-30-days-content]
+verify_jwt = false
+
+[functions.get-public-answer]
+verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.test-integration]
+verify_jwt = false
+
+[functions.check-planning-completeness]
+verify_jwt = false
+schedule = "0 */6 * * *"
+
+[functions.daily-planning-fill]
+verify_jwt = false
+schedule = "0 6 * * *"
+
+[functions.suggest-audiences]
+verify_jwt = false
+
+[functions.suggest-keywords]
+verify_jwt = false
+
+[functions.gsc-request-indexing]
+verify_jwt = false
+
+[functions.crawl-site-keywords]
+verify_jwt = false
+
+[functions.google-oauth-url]
+verify_jwt = false
+
+[functions.google-oauth-token]
+verify_jwt = false
+
+[functions.list-search-console-sites]
+verify_jwt = false
+
+[functions.get-search-console-data]
+verify_jwt = false
+
+[functions.gsc-indexing-diagnostics]
+verify_jwt = false
+
+[functions.analyze-gsc-anomalies]
+verify_jwt = false
+
+[functions.gmb-oauth-url]
+verify_jwt = false
+
+[functions.gmb-fetch-business]
+verify_jwt = false
+
+[functions.gmb-publish-post]
+verify_jwt = false
+
+[functions.gmb-local-visibility]
+verify_jwt = false
+
+[functions.generate-local-answer]
+verify_jwt = false
+
+[functions.places-search]
+verify_jwt = false
+
+[functions.generate-30-local-answers]
+verify_jwt = false
+
+[functions.index-published-articles]
+verify_jwt = false
+schedule = "30 * * * *"
+
+[functions.gsc-test-indexation]
+verify_jwt = false
+
+[functions.serp-first]
+verify_jwt = false
+
+[functions.abandoned-cart-emails]
+verify_jwt = false
+schedule = "0 * * * *"
+
+[functions.generate-strategic-articles]
+verify_jwt = false
+
+[functions.admin-login-as]
+verify_jwt = false
+
+[functions.free-audit]
+verify_jwt = false
+
+[functions.send-email]
+verify_jwt = false
+
+[functions.email-webhook]
+verify_jwt = false
+
+[functions.db-email-trigger]
+verify_jwt = false
+
+[functions.parse-sitemap]
+verify_jwt = false
+
+[functions.sitemap]
+verify_jwt = false
+
+[functions.receive-article]
+verify_jwt = false
+
+[functions.delete-project-content]
+verify_jwt = false
+
+[functions.reset-project-content]
+verify_jwt = false
+
+[functions.send-audit-email]
+verify_jwt = false
+
+[functions.analyze-aeo]
+verify_jwt = false
+
+[functions.create-audit-checkout]
+verify_jwt = false
+
+[functions.verify-audit-payment]
+verify_jwt = false
+
+[functions.bulk-index-articles]
+verify_jwt = false
+
+[functions.internal-scraper]
+verify_jwt = false
+
+[functions.generate-google-ads]
+verify_jwt = false
+
+[functions.google-ads-oauth-url]
+verify_jwt = false
+
+[functions.google-ads-oauth-token]
+verify_jwt = false
+
+[functions.sync-google-ads]
+verify_jwt = false
+
+[functions.analyze-google-ads]
+verify_jwt = false
+
+[functions.toggle-ad-group-status]
+verify_jwt = false
+
+[functions.create-google-ads-conversions]
+verify_jwt = false
+
+[functions.add-negative-keyword]
+verify_jwt = false
+
+[functions.create-competitor-ad-group]
+verify_jwt = false
+
+[functions.unlock-articles]
+verify_jwt = false
+
+[functions.publish-geo-content]
+verify_jwt = false
+schedule = "0 2 * * *"
+
+[functions.create-search-campaign]
+verify_jwt = false
+
+[functions.manage-pmax-service]
+verify_jwt = false
+
+[functions.manage-google-ads]
+verify_jwt = false
+
+[functions.prerender]
+verify_jwt = false
+
+[functions.shopify-oauth-install]
+verify_jwt = false
+
+[functions.shopify-oauth-callback]
+verify_jwt = false
+
+[functions.shopify-import-products]
+verify_jwt = false
+
+
+[functions.shopify-fetch-context]
+verify_jwt = false
+
+[functions.shopify-publish-article]
+verify_jwt = false
+
+[functions.debug-shopping-status]
+verify_jwt = false
+
+[functions.rolling-30-day-planner]
+verify_jwt = false
+
